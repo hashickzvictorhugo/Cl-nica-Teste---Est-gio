@@ -14,6 +14,8 @@ import {
 import { getProviderById, resolveProvider } from "@/lib/providers";
 import {
   getEndTime,
+  hasSlotStarted,
+  isPastDate,
   isSupportedDate,
   isValidStartTime,
   isWeekend,
@@ -160,6 +162,15 @@ export async function POST(request: Request) {
     );
   }
 
+  const schedulingNow = new Date();
+  if (isPastDate(date, schedulingNow)) {
+    return jsonError(
+      422,
+      "PAST_DATE",
+      "Não é possível criar um agendamento em uma data que já passou.",
+    );
+  }
+
   if (!provider) {
     return jsonError(
       400,
@@ -173,6 +184,14 @@ export async function POST(request: Request) {
       422,
       "INVALID_SLOT",
       "Escolha um horário cheio entre 08:00 e 17:00.",
+    );
+  }
+
+  if (hasSlotStarted(date, startTime, schedulingNow)) {
+    return jsonError(
+      422,
+      "PAST_SLOT",
+      "Esse horário já começou ou passou. Escolha um horário futuro.",
     );
   }
 
@@ -211,7 +230,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const now = new Date().toISOString();
+    const now = schedulingNow.toISOString();
     const values = {
       id: crypto.randomUUID(),
       appointmentDate: date,

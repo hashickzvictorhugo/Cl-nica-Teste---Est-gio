@@ -12,6 +12,8 @@ import {
   buildScheduleSlots,
   BUSINESS_HOURS,
   getWeekdayLabel,
+  hasSlotStarted,
+  isPastDate,
   isSupportedDate,
   isWeekend,
   SCHEDULING_YEAR,
@@ -41,6 +43,15 @@ export async function GET(request: Request) {
     );
   }
 
+  const now = new Date();
+  if (isPastDate(date, now)) {
+    return jsonError(
+      422,
+      "PAST_DATE",
+      "Essa data já passou. Escolha hoje ou uma data futura.",
+    );
+  }
+
   try {
     const holiday = await getHolidayForDate(date);
     const weekend = isWeekend(date);
@@ -62,7 +73,10 @@ export async function GET(request: Request) {
     const slots = buildScheduleSlots(
       occupiedRows.map((row) => row.startTime),
       Boolean(blockedReason),
-    );
+    ).map((slot) => ({
+      ...slot,
+      available: slot.available && !hasSlotStarted(date, slot.startTime, now),
+    }));
     const availableSlots = slots.filter((slot) => slot.available);
 
     return Response.json(

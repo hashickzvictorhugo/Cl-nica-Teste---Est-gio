@@ -289,7 +289,7 @@ export default function Home() {
       <section className={styles.finalCta}>
         <div className={styles.container}>
           <div>
-            <span>CASE TÉCNICO · GRADE AGENDA</span>
+            <span>CASE TÉCNICO · GARDE AGENDA</span>
             <h2>Menos operação manual. Mais clareza para quem agenda e para quem atende.</h2>
           </div>
           <a href="#agendamento">Abrir agenda</a>

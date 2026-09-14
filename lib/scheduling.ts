@@ -96,6 +96,17 @@ export function hasSlotStarted(
   return startTime <= current.time;
 }
 
+export function hasSlotEnded(
+  date: string,
+  startTime: SlotStart,
+  now: Date = new Date(),
+) {
+  const current = getSchedulingClock(now);
+  if (date < current.date) return true;
+  if (date > current.date) return false;
+  return getEndTime(startTime) <= current.time;
+}
+
 export function buildScheduleSlots(
   occupiedStartTimes: Iterable<string> = [],
   blocked = false,

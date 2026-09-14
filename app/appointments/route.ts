@@ -7,6 +7,7 @@ import {
   getHolidayForDate,
   HolidayServiceError,
 } from "@/lib/holiday-service";
+import { getProviderById, resolveProvider } from "@/lib/providers";
 import {
   getEndTime,
   isSupportedDate,
@@ -21,6 +22,7 @@ import {
 export const dynamic = "force-dynamic";
 
 function presentAppointment(row: typeof appointments.$inferSelect) {
+  const provider = getProviderById(row.providerId);
   return {
     id: row.id,
     date: row.appointmentDate,
@@ -29,6 +31,13 @@ function presentAppointment(row: typeof appointments.$inferSelect) {
       ? getEndTime(row.startTime)
       : row.startTime,
     timezone: TIMEZONE,
+    provider: provider ?? {
+      id: row.providerId,
+      name: "Profissional",
+      specialty: "Atendimento",
+      initials: "PR",
+      description: "",
+    },
     patientName: row.patientName,
     patientPhone: row.patientPhone ?? "",
     createdAt: row.createdAt,
@@ -42,6 +51,7 @@ export async function GET() {
       .from(appointments)
       .orderBy(
         asc(appointments.appointmentDate),
+        asc(appointments.providerId),
         asc(appointments.startTime),
         asc(appointments.createdAt),
       )
@@ -77,6 +87,7 @@ export async function POST(request: Request) {
 
   const date = payload.date;
   const startTime = payload.startTime;
+  const provider = resolveProvider(payload.providerId);
   const patientName = sanitizePatientName(payload.patientName);
   const patientPhone = sanitizePatientPhone(payload.patientPhone);
 
@@ -85,6 +96,14 @@ export async function POST(request: Request) {
       400,
       "INVALID_DATE",
       `Informe uma data válida de ${SCHEDULING_YEAR} no formato AAAA-MM-DD.`,
+    );
+  }
+
+  if (!provider) {
+    return jsonError(
+      400,
+      "INVALID_PROVIDER",
+      "Escolha um profissional válido para o atendimento.",
     );
   }
 
@@ -135,6 +154,7 @@ export async function POST(request: Request) {
       id: crypto.randomUUID(),
       appointmentDate: date,
       startTime,
+      providerId: provider.id,
       patientName,
       patientPhone: patientPhone || null,
       createdAt: new Date().toISOString(),
@@ -144,7 +164,11 @@ export async function POST(request: Request) {
       .insert(appointments)
       .values(values)
       .onConflictDoNothing({
-        target: [appointments.appointmentDate, appointments.startTime],
+        target: [
+          appointments.providerId,
+          appointments.appointmentDate,
+          appointments.startTime,
+        ],
       })
       .returning();
 
@@ -152,7 +176,7 @@ export async function POST(request: Request) {
       return jsonError(
         409,
         "SLOT_TAKEN",
-        "Esse horário acabou de ser reservado. Escolha outro.",
+        `Esse horário com ${provider.name} acabou de ser reservado. Escolha outro.`,
       );
     }
 

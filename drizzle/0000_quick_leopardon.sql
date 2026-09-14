@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS `appointments` (
   `appointment_date` text NOT NULL,
   `start_time` text NOT NULL,
   `patient_name` text NOT NULL,
+  `patient_phone` text,
   `created_at` text NOT NULL,
   CONSTRAINT "appointments_start_time_check" CHECK("appointments"."start_time" IN ('08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'))
 );

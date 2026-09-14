@@ -1,15 +1,18 @@
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const database = "clinica-teste-agendamentos-db";
-const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const wranglerBin = fileURLToPath(
+  new URL("../node_modules/wrangler/bin/wrangler.js", import.meta.url),
+);
 
 function runWrangler(args, capture = false) {
   const result = spawnSync(
-    pnpm,
-    ["exec", "wrangler", ...args],
+    process.execPath,
+    [wranglerBin, ...args],
     {
       encoding: "utf8",
-      stdio: capture ? ["inherit", "pipe", "pipe"] : "inherit",
+      stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
     },
   );
 

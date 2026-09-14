@@ -8,9 +8,10 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "vite build",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "node --experimental-strip-types --test --test-isolation=none tests/*.test.ts",
-    "check": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
     "db:generate": "drizzle-kit generate",
     "db:local:migrate": "wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_quick_leopardon.sql"
   },
@@ -29,6 +30,8 @@
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.3.4",
     "react-server-dom-webpack": "19.2.6",
     "typescript": "5.9.3",
     "vinext": "1.0.0-beta.5",

@@ -19,6 +19,11 @@ type Appointment = {
   endTime: string;
   patientName: string;
 };
+type ApiErrorPayload = {
+  error?: {
+    message?: string;
+  };
+};
 
 function today2026() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -35,9 +40,10 @@ function today2026() {
 
 async function json<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
-  const data = await response.json();
+  const data: unknown = await response.json();
   if (!response.ok) {
-    throw new Error(data?.error?.message ?? "Não foi possível concluir a solicitação.");
+    const payload = data as ApiErrorPayload;
+    throw new Error(payload.error?.message ?? "Não foi possível concluir a solicitação.");
   }
   return data as T;
 }

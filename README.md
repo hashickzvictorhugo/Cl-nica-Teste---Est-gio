@@ -2,7 +2,25 @@
 
 [![CI](https://github.com/hashickzvictorhugo/Cl-nica-Teste---Est-gio/actions/workflows/ci.yml/badge.svg)](https://github.com/hashickzvictorhugo/Cl-nica-Teste---Est-gio/actions/workflows/ci.yml)
 
-Sistema web de agendamento desenvolvido para o desafio técnico de Estágio Full Stack. O usuário escolhe uma data, consulta horários disponíveis e confirma uma consulta. O backend valida dias úteis e feriados nacionais de 2026, impede conflitos de horário e persiste os agendamentos em SQLite/Cloudflare D1.
+Sistema web de agendamento desenvolvido para o desafio técnico de Estágio Full Stack. O usuário escolhe uma data, consulta horários disponíveis, informa nome e telefone/WhatsApp opcional e confirma a consulta. O backend valida dias úteis e feriados nacionais de 2026, impede conflitos de horário e persiste os agendamentos em Cloudflare D1.
+
+## Produção
+
+Aplicação publicada em:
+
+**https://clinica-teste-agendamentos.hashickzvictorhugo.workers.dev**
+
+## Funcionalidades
+
+- consulta de horários disponíveis em tempo real;
+- criação de agendamentos com nome e telefone/WhatsApp opcional;
+- cancelamento de consultas já marcadas;
+- bloqueio de finais de semana e feriados nacionais;
+- proteção contra reserva duplicada do mesmo horário;
+- painel com quantidade de consultas no dia, horários livres e total na agenda;
+- persistência em Cloudflare D1;
+- interface responsiva;
+- validações de entrada e mensagens de erro amigáveis.
 
 ## Requisitos do desafio
 
@@ -12,6 +30,7 @@ Sistema web de agendamento desenvolvido para o desafio técnico de Estágio Full
 | Exibir horários disponíveis | `GET /available?date=AAAA-MM-DD` |
 | Criar agendamento | `POST /appointments` |
 | Listar agendamentos | `GET /appointments` |
+| Cancelar agendamento | `DELETE /appointments?id=<id>` |
 | Bloquear finais de semana | Validação no backend |
 | Bloquear feriados | Nager.Date consumida exclusivamente no backend |
 | Bloquear horários ocupados | Consulta de disponibilidade + índice único no banco |
@@ -27,6 +46,7 @@ Sistema web de agendamento desenvolvido para o desafio técnico de Estágio Full
 - **API externa:** [Nager.Date](https://date.nager.at/api/v3/PublicHolidays/2026/BR)
 - **Testes:** Node.js Test Runner + SQLite em memória
 - **Qualidade:** ESLint, TypeScript e GitHub Actions
+- **Deploy:** Cloudflare Workers
 
 ## Arquitetura
 
@@ -35,7 +55,8 @@ Frontend
   │
   ├── GET /available?date=2026-02-10
   ├── POST /appointments
-  └── GET /appointments
+  ├── GET /appointments
+  └── DELETE /appointments?id=<id>
           │
           ▼
 Backend / regras de negócio
@@ -54,6 +75,7 @@ O frontend nunca consulta a API de feriados diretamente. A validação é refeit
 - feriados nacionais de 2026 e finais de semana são bloqueados;
 - horários já ocupados não podem ser reservados novamente;
 - o nome do paciente é normalizado e limitado a 2–80 caracteres;
+- telefone/WhatsApp é opcional e, quando informado, aceita de 8 a 13 dígitos após normalização;
 - datas são tratadas como `AAAA-MM-DD`, evitando deslocamentos de dia por fuso horário;
 - fuso de referência: `America/Sao_Paulo`.
 
@@ -98,7 +120,8 @@ Datas inválidas retornam `400`. Finais de semana e feriados retornam `200`, mas
 {
   "date": "2026-02-10",
   "startTime": "09:00",
-  "patientName": "Maria Silva"
+  "patientName": "Maria Silva",
+  "patientPhone": "18999999999"
 }
 ```
 
@@ -107,6 +130,10 @@ Uma reserva válida retorna `201`. Horário já reservado retorna `409`.
 ### `GET /appointments`
 
 Retorna até 100 agendamentos, ordenados por data, horário e criação.
+
+### `DELETE /appointments?id=<id>`
+
+Cancela um agendamento existente. Retorna `404` quando o identificador não existe.
 
 ## Executando localmente
 
@@ -123,6 +150,20 @@ pnpm run dev
 ```
 
 A aplicação fica disponível em `http://localhost:5173`.
+
+## Deploy
+
+O projeto está configurado para Cloudflare Workers + D1.
+
+```bash
+pnpm run release
+```
+
+Para uma base de produção criada antes da inclusão do campo de telefone, aplique uma única vez:
+
+```bash
+pnpm run db:remote:add-phone
+```
 
 ## Validação
 
@@ -141,14 +182,14 @@ pnpm run test
 pnpm run build
 ```
 
-Os testes cobrem validação de datas, finais de semana, geração de slots, horários ocupados, normalização de nomes, resposta da API de feriados, cache e restrições de unicidade/horário do banco.
+Os testes cobrem validação de datas, finais de semana, geração de slots, horários ocupados, normalização de nomes e telefones, resposta da API de feriados, cache e restrições de unicidade/horário do banco.
 
 ## Estrutura principal
 
 ```text
 app/
   available/route.ts          # GET /available
-  appointments/route.ts       # GET e POST /appointments
+  appointments/route.ts       # GET, POST e DELETE /appointments
   components/SchedulingApp.tsx
 
 db/
@@ -157,6 +198,7 @@ db/
 
 drizzle/
   0000_quick_leopardon.sql
+  0001_add_patient_phone.sql
 
 lib/
   api-response.ts
@@ -169,6 +211,6 @@ tests/
   scheduling.test.ts
 ```
 
-## Decisões de escopo
+## Observação de privacidade
 
-O desafio solicita o fluxo mínimo de consulta e criação de agendamentos. Por isso, autenticação, edição e cancelamento de consultas não foram adicionados. A interface pede nomes fictícios para demonstração e não deve ser usada para armazenar dados reais de pacientes.
+Este é um projeto demonstrativo. A interface orienta o uso de dados fictícios e não deve ser usada para armazenar dados reais de pacientes.

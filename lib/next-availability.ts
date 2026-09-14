@@ -1,10 +1,10 @@
 import { PROVIDERS } from "./providers.ts";
-import { isWeekend, SLOT_STARTS } from "./scheduling.ts";
+import { isWeekend, SLOT_STARTS, type SlotStart } from "./scheduling.ts";
 
 export type NextAvailability = {
   date: string;
   providerId: string;
-  startTime: string;
+  startTime: SlotStart;
 };
 
 export function appointmentSlotKey(

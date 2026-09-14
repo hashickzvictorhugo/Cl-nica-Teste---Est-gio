@@ -1,0 +1,60 @@
+name: Verify New Production Features
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-new-features.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BASE_URL: https://clinica-teste-agendamentos.hashickzvictorhugo.workers.dev
+      TEST_DATE: "2026-12-29"
+      TEST_PHONE: "18999999999"
+
+    steps:
+      - name: Validate phone, persistence, cancel and slot release
+        shell: bash
+        run: |
+          set -euo pipefail
+          CREATED_ID=""
+          cleanup() {
+            if [ -n "$CREATED_ID" ]; then
+              curl -sS -X DELETE "$BASE_URL/appointments?id=$CREATED_ID" >/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          curl --retry 5 --retry-delay 2 --retry-all-errors -fsS "$BASE_URL/" -o /tmp/home.html
+          test -s /tmp/home.html
+
+          curl -fsS "$BASE_URL/available?date=$TEST_DATE" -o /tmp/available-before.json
+          SLOT="$(jq -r '.slots[] | select(.available == true) | .startTime' /tmp/available-before.json | head -n 1)"
+          test -n "$SLOT"
+
+          PAYLOAD="$(jq -nc --arg date "$TEST_DATE" --arg startTime "$SLOT" --arg patientName "Maria Silva" --arg patientPhone "$TEST_PHONE" '{date:$date,startTime:$startTime,patientName:$patientName,patientPhone:$patientPhone}')"
+          STATUS="$(curl -sS -o /tmp/create.json -w '%{http_code}' -H 'content-type: application/json' -d "$PAYLOAD" "$BASE_URL/appointments")"
+          cat /tmp/create.json
+          test "$STATUS" = "201"
+          jq -e '.appointment.patientName == "Maria Silva"' /tmp/create.json
+          jq -e '.appointment.patientPhone == env.TEST_PHONE' /tmp/create.json
+          CREATED_ID="$(jq -r '.appointment.id' /tmp/create.json)"
+          test -n "$CREATED_ID"
+
+          curl -fsS "$BASE_URL/appointments" -o /tmp/list.json
+          jq -e --arg id "$CREATED_ID" --arg phone "$TEST_PHONE" '.appointments | any(.id == $id and .patientPhone == $phone)' /tmp/list.json
+
+          STATUS="$(curl -sS -o /tmp/delete.json -w '%{http_code}' -X DELETE "$BASE_URL/appointments?id=$CREATED_ID")"
+          cat /tmp/delete.json
+          test "$STATUS" = "200"
+          jq -e --arg id "$CREATED_ID" '.id == $id' /tmp/delete.json
+          CREATED_ID=""
+
+          curl -fsS "$BASE_URL/appointments" -o /tmp/list-after.json
+          jq -e --arg id "$(jq -r '.id' /tmp/delete.json)" '.appointments | all(.id != $id)' /tmp/list-after.json
+
+          curl -fsS "$BASE_URL/available?date=$TEST_DATE" -o /tmp/available-after.json
+          jq -e --arg slot "$SLOT" '.slots | any(.startTime == $slot and .available == true)' /tmp/available-after.json

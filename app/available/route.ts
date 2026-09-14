@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { appointments } from "@/db/schema";
@@ -55,6 +55,7 @@ export async function GET(request: Request) {
             and(
               eq(appointments.appointmentDate, date),
               eq(appointments.providerId, provider.id),
+              ne(appointments.status, "CANCELLED"),
             ),
           );
 
@@ -62,6 +63,7 @@ export async function GET(request: Request) {
       occupiedRows.map((row) => row.startTime),
       Boolean(blockedReason),
     );
+    const availableSlots = slots.filter((slot) => slot.available);
 
     return Response.json(
       {
@@ -74,7 +76,8 @@ export async function GET(request: Request) {
         holiday,
         businessHours: BUSINESS_HOURS,
         slots,
-        availableSlots: slots.filter((slot) => slot.available),
+        availableSlots,
+        availableCount: availableSlots.length,
       },
       { headers: { "Cache-Control": "no-store" } },
     );

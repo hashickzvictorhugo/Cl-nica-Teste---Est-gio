@@ -180,23 +180,54 @@ export function SchedulingApp() {
   return (
     <main className="page-shell">
       <header className="topbar">
-        <div className="brand-mark">CT</div>
-        <div>
-          <strong>Clínica Teste</strong>
-          <span>Agendamento online</span>
+        <div className="brand-lockup">
+          <div className="brand-mark">G+</div>
+          <div>
+            <strong>Garde Agenda</strong>
+            <span>Saúde · Automação · Full Stack</span>
+          </div>
         </div>
+        <div className="case-pill"><span /> Case técnico demonstrativo</div>
       </header>
 
       <section className="hero">
-        <p className="eyebrow">AGENDA ONLINE</p>
-        <h1>Encontre um horário para cuidar de você.</h1>
-        <p>
-          Consulte a disponibilidade em tempo real e confirme uma consulta em poucos passos.
+        <p className="eyebrow">PROBLEMA REAL · PROCESSO AUTOMATIZADO</p>
+        <h1>
+          Menos mensagens manuais.<br />
+          <span>Mais consultas confirmadas.</span>
+        </h1>
+        <p className="hero-copy">
+          Um fluxo digital para transformar pedidos de horário em agendamentos válidos,
+          com disponibilidade em tempo real, regras de negócio e persistência de dados.
         </p>
+
+        <div className="hero-tags" aria-label="Destaques técnicos">
+          <span>API real de feriados</span>
+          <span>Bloqueio de conflitos</span>
+          <span>Cloudflare D1</span>
+        </div>
+
+        <div className="flow-panel" aria-label="Fluxo do agendamento">
+          <div className="flow-step">
+            <div className="flow-icon">WA</div>
+            <div><small>ENTRADA</small><strong>Paciente pede horário</strong><span>WhatsApp ou web</span></div>
+          </div>
+          <div className="flow-arrow">→</div>
+          <div className="flow-step">
+            <div className="flow-icon">API</div>
+            <div><small>VALIDAÇÃO</small><strong>Regras em tempo real</strong><span>Data, feriado e conflito</span></div>
+          </div>
+          <div className="flow-arrow">→</div>
+          <div className="flow-step">
+            <div className="flow-icon">OK</div>
+            <div><small>RESULTADO</small><strong>Consulta confirmada</strong><span>Registro persistido</span></div>
+          </div>
+        </div>
       </section>
 
       <section className="content-grid">
         <form className="booking-card" onSubmit={submit}>
+          <div className="card-kicker">AGENDAMENTO INTELIGENTE</div>
           <div className="section-heading">
             <span>1</span>
             <div><h2>Escolha a data</h2><p>Atendimento em dias úteis de 2026.</p></div>
@@ -213,7 +244,7 @@ export function SchedulingApp() {
           <div className="date-meta" aria-live="polite">
             <span className="meta-pill">{availability?.weekday ?? "Consultando data…"}</span>
             <span className="meta-pill">
-              {availability?.timezone ?? "America/Sao_Paulo"} · Horário de Brasília
+              {availability?.timezone ?? "America/Sao_Paulo"} · Brasília
             </span>
             <span className={blocked ? "meta-pill blocked" : "meta-pill ok"}>{dayStatus}</span>
           </div>
@@ -221,7 +252,7 @@ export function SchedulingApp() {
           <div className="divider" />
           <div className="section-heading">
             <span>2</span>
-            <div><h2>Escolha o horário</h2><p>Consultas de uma hora, das 08h às 18h.</p></div>
+            <div><h2>Veja a disponibilidade</h2><p>Consultas de uma hora, das 08h às 18h.</p></div>
           </div>
 
           {loading ? <p className="status">Consultando agenda…</p> : null}
@@ -252,7 +283,7 @@ export function SchedulingApp() {
           <div className="divider" />
           <div className="section-heading">
             <span>3</span>
-            <div><h2>Confirme seus dados</h2><p>Use dados fictícios para testar o projeto.</p></div>
+            <div><h2>Identifique o paciente</h2><p>Nome e contato para concluir o agendamento.</p></div>
           </div>
           <label className="field-label" htmlFor="patient-name">Nome do paciente</label>
           <input
@@ -295,19 +326,23 @@ export function SchedulingApp() {
         </form>
 
         <aside className="side-card">
+          <div className="side-eyebrow">OPERAÇÃO EM TEMPO REAL</div>
           <div className="side-title">
-            <div><h2>Na agenda</h2><p>Consultas confirmadas</p></div>
+            <div><h2>Agenda da clínica</h2><p>Visão resumida das consultas</p></div>
             <strong>{appointments.length}</strong>
           </div>
 
           <div className="metrics" aria-label="Resumo da agenda">
             <div><strong>{selectedDateAppointments}</strong><span>no dia</span></div>
-            <div><strong>{availableSlots}</strong><span>horários livres</span></div>
+            <div><strong>{availableSlots}</strong><span>livres</span></div>
             <div><strong>{appointments.length}</strong><span>no total</span></div>
           </div>
 
           {appointments.length === 0 ? (
-            <div className="empty">Nenhuma consulta marcada ainda.</div>
+            <div className="empty">
+              <strong>Agenda livre</strong>
+              <span>Nenhuma consulta confirmada ainda.</span>
+            </div>
           ) : (
             <ol className="appointments">
               {appointments.map((item) => (
@@ -331,6 +366,12 @@ export function SchedulingApp() {
               ))}
             </ol>
           )}
+
+          <div className="system-card">
+            <div><span className="status-dot" /><strong>Regras automatizadas</strong></div>
+            <p>Feriados, fins de semana e horários ocupados são validados pelo backend.</p>
+          </div>
+
           <div className="hours">
             <strong>Horário de atendimento</strong>
             <span>Segunda a sexta, 08h–18h</span>
@@ -339,7 +380,11 @@ export function SchedulingApp() {
         </aside>
       </section>
 
-      <footer>Clínica Teste · Projeto demonstrativo de agendamento full stack</footer>
+      <footer>
+        <strong>Garde Agenda</strong>
+        <span>Case técnico Full Stack · conceito demonstrativo inspirado no ecossistema Garde.</span>
+        <small>Não é um produto oficial da Garde Inteligência Empresarial.</small>
+      </footer>
     </main>
   );
 }

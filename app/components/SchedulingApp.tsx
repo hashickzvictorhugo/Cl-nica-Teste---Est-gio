@@ -2,9 +2,12 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import { DEFAULT_PROVIDER_ID, PROVIDERS, type Provider } from "@/lib/providers";
+
 type Slot = { startTime: string; endTime: string; available: boolean };
 type Availability = {
   date: string;
+  provider: Provider;
   timezone: string;
   weekday: string;
   isBusinessDay: boolean;
@@ -17,6 +20,7 @@ type Appointment = {
   date: string;
   startTime: string;
   endTime: string;
+  provider: Provider;
   patientName: string;
   patientPhone: string;
 };
@@ -61,6 +65,7 @@ async function json<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T>
 }
 
 export function SchedulingApp() {
+  const [providerId, setProviderId] = useState(DEFAULT_PROVIDER_ID);
   const [date, setDate] = useState(today2026);
   const [availability, setAvailability] = useState<Availability | null>(null);
   const [slot, setSlot] = useState<string>("");
@@ -73,18 +78,23 @@ export function SchedulingApp() {
   const [message, setMessage] = useState<string>("");
   const [error, setError] = useState<string>("");
 
+  const selectedProvider = useMemo(
+    () => PROVIDERS.find((provider) => provider.id === providerId) ?? PROVIDERS[0],
+    [providerId],
+  );
+
   const loadAppointments = useCallback(async () => {
     const data = await json<{ appointments: Appointment[] }>("/appointments");
     setAppointments(data.appointments);
   }, []);
 
-  const loadAvailability = useCallback(async (selectedDate: string) => {
+  const loadAvailability = useCallback(async (selectedDate: string, selectedProviderId: string) => {
     setLoading(true);
     setError("");
     setSlot("");
     try {
       const data = await json<Availability>(
-        `/available?date=${encodeURIComponent(selectedDate)}`,
+        `/available?date=${encodeURIComponent(selectedDate)}&providerId=${encodeURIComponent(selectedProviderId)}`,
       );
       setAvailability(data);
     } catch (err) {
@@ -99,13 +109,13 @@ export function SchedulingApp() {
     let active = true;
     queueMicrotask(() => {
       if (!active) return;
-      void loadAvailability(date);
+      void loadAvailability(date, providerId);
       void loadAppointments().catch(() => undefined);
     });
     return () => {
       active = false;
     };
-  }, [date, loadAppointments, loadAvailability]);
+  }, [date, providerId, loadAppointments, loadAvailability]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -120,20 +130,21 @@ export function SchedulingApp() {
         body: JSON.stringify({
           date,
           startTime: slot,
+          providerId,
           patientName: name,
           patientPhone: phone,
         }),
       });
       setMessage(
-        `Agendamento confirmado. Protocolo ${created.appointment.id.slice(0, 8).toUpperCase()}.`,
+        `Agendamento com ${created.appointment.provider.name} confirmado. Protocolo ${created.appointment.id.slice(0, 8).toUpperCase()}.`,
       );
       setName("");
       setPhone("");
       setSlot("");
-      await Promise.all([loadAvailability(date), loadAppointments()]);
+      await Promise.all([loadAvailability(date, providerId), loadAppointments()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao agendar.");
-      await loadAvailability(date);
+      await loadAvailability(date, providerId);
     } finally {
       setSaving(false);
     }
@@ -141,7 +152,7 @@ export function SchedulingApp() {
 
   async function cancelAppointment(appointment: Appointment) {
     const confirmed = window.confirm(
-      `Cancelar a consulta de ${appointment.patientName} em ${appointment.date} às ${appointment.startTime}?`,
+      `Cancelar a consulta de ${appointment.patientName} com ${appointment.provider.name} em ${appointment.date} às ${appointment.startTime}?`,
     );
     if (!confirmed) return;
 
@@ -154,7 +165,7 @@ export function SchedulingApp() {
         { method: "DELETE" },
       );
       setMessage("Agendamento cancelado com sucesso.");
-      await Promise.all([loadAvailability(date), loadAppointments()]);
+      await Promise.all([loadAvailability(date, providerId), loadAppointments()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao cancelar agendamento.");
     } finally {
@@ -163,8 +174,14 @@ export function SchedulingApp() {
   }
 
   const selectedDateAppointments = useMemo(
-    () => appointments.filter((item) => item.date === date).length,
-    [appointments, date],
+    () => appointments.filter(
+      (item) => item.date === date && item.provider.id === providerId,
+    ).length,
+    [appointments, date, providerId],
+  );
+  const selectedProviderAppointments = useMemo(
+    () => appointments.filter((item) => item.provider.id === providerId).length,
+    [appointments, providerId],
   );
   const availableSlots = availability?.slots.filter((item) => item.available).length ?? 0;
 
@@ -198,11 +215,12 @@ export function SchedulingApp() {
         </h1>
         <p className="hero-copy">
           Um fluxo digital para transformar pedidos de horário em agendamentos válidos,
-          com disponibilidade em tempo real, regras de negócio e persistência de dados.
+          com disponibilidade por profissional, regras de negócio e persistência de dados.
         </p>
 
         <div className="hero-tags" aria-label="Destaques técnicos">
           <span>API real de feriados</span>
+          <span>Agenda por profissional</span>
           <span>Bloqueio de conflitos</span>
           <span>Cloudflare D1</span>
         </div>
@@ -215,7 +233,7 @@ export function SchedulingApp() {
           <div className="flow-arrow">→</div>
           <div className="flow-step">
             <div className="flow-icon">API</div>
-            <div><small>VALIDAÇÃO</small><strong>Regras em tempo real</strong><span>Data, feriado e conflito</span></div>
+            <div><small>VALIDAÇÃO</small><strong>Agenda individual</strong><span>Profissional, data e conflito</span></div>
           </div>
           <div className="flow-arrow">→</div>
           <div className="flow-step">
@@ -228,8 +246,38 @@ export function SchedulingApp() {
       <section className="content-grid">
         <form className="booking-card" onSubmit={submit}>
           <div className="card-kicker">AGENDAMENTO INTELIGENTE</div>
+
           <div className="section-heading">
             <span>1</span>
+            <div><h2>Escolha quem vai atender</h2><p>Cada profissional possui uma agenda independente.</p></div>
+          </div>
+          <div className="provider-grid" role="radiogroup" aria-label="Profissionais disponíveis">
+            {PROVIDERS.map((provider) => {
+              const selected = provider.id === providerId;
+              return (
+                <button
+                  aria-checked={selected}
+                  className={selected ? "provider-card selected" : "provider-card"}
+                  key={provider.id}
+                  onClick={() => setProviderId(provider.id)}
+                  role="radio"
+                  type="button"
+                >
+                  <span className="provider-avatar">{provider.initials}</span>
+                  <span className="provider-copy">
+                    <strong>{provider.name}</strong>
+                    <span>{provider.specialty}</span>
+                    <small>{provider.description}</small>
+                  </span>
+                  <span className="provider-check">✓</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="divider" />
+          <div className="section-heading">
+            <span>2</span>
             <div><h2>Escolha a data</h2><p>Atendimento em dias úteis de 2026.</p></div>
           </div>
           <input
@@ -249,13 +297,21 @@ export function SchedulingApp() {
             <span className={blocked ? "meta-pill blocked" : "meta-pill ok"}>{dayStatus}</span>
           </div>
 
-          <div className="divider" />
-          <div className="section-heading">
-            <span>2</span>
-            <div><h2>Veja a disponibilidade</h2><p>Consultas de uma hora, das 08h às 18h.</p></div>
+          <div className="selected-provider-strip">
+            <span className="provider-avatar">{selectedProvider.initials}</span>
+            <div>
+              <strong>{selectedProvider.name}</strong>
+              <span>{selectedProvider.specialty} · agenda das 08h às 18h</span>
+            </div>
           </div>
 
-          {loading ? <p className="status">Consultando agenda…</p> : null}
+          <div className="divider" />
+          <div className="section-heading">
+            <span>3</span>
+            <div><h2>Veja a disponibilidade</h2><p>Horários de uma hora, independentes para cada profissional.</p></div>
+          </div>
+
+          {loading ? <p className="status">Consultando agenda de {selectedProvider.name}…</p> : null}
           {!loading && blocked ? (
             <div className="notice">
               {blocked === "WEEKEND"
@@ -282,7 +338,7 @@ export function SchedulingApp() {
 
           <div className="divider" />
           <div className="section-heading">
-            <span>3</span>
+            <span>4</span>
             <div><h2>Identifique o paciente</h2><p>Nome e contato para concluir o agendamento.</p></div>
           </div>
           <label className="field-label" htmlFor="patient-name">Nome do paciente</label>
@@ -321,7 +377,7 @@ export function SchedulingApp() {
             disabled={!slot || name.trim().length < 2 || saving}
             type="submit"
           >
-            {saving ? "Confirmando…" : "Confirmar agendamento"}
+            {saving ? "Confirmando…" : `Confirmar com ${selectedProvider.name}`}
           </button>
         </form>
 
@@ -332,10 +388,16 @@ export function SchedulingApp() {
             <strong>{appointments.length}</strong>
           </div>
 
+          <div className="provider-summary">
+            <small>PROFISSIONAL SELECIONADO</small>
+            <strong>{selectedProvider.name}</strong>
+            <span>{selectedProvider.specialty}</span>
+          </div>
+
           <div className="metrics" aria-label="Resumo da agenda">
             <div><strong>{selectedDateAppointments}</strong><span>no dia</span></div>
             <div><strong>{availableSlots}</strong><span>livres</span></div>
-            <div><strong>{appointments.length}</strong><span>no total</span></div>
+            <div><strong>{selectedProviderAppointments}</strong><span>do profissional</span></div>
           </div>
 
           {appointments.length === 0 ? (
@@ -351,6 +413,7 @@ export function SchedulingApp() {
                   <div className="appointment-info">
                     <strong>{item.startTime}–{item.endTime}</strong>
                     <span>{item.patientName}</span>
+                    <small className="appointment-provider">{item.provider.name} · {item.provider.specialty}</small>
                     {item.patientPhone ? <small>{formatPhone(item.patientPhone)}</small> : null}
                   </div>
                   <button
@@ -369,13 +432,13 @@ export function SchedulingApp() {
 
           <div className="system-card">
             <div><span className="status-dot" /><strong>Regras automatizadas</strong></div>
-            <p>Feriados, fins de semana e horários ocupados são validados pelo backend.</p>
+            <p>Feriados, fins de semana e conflitos são validados pelo backend por profissional.</p>
           </div>
 
           <div className="hours">
             <strong>Horário de atendimento</strong>
             <span>Segunda a sexta, 08h–18h</span>
-            <span>Horário de Brasília</span>
+            <span>10 horários por profissional · Brasília</span>
           </div>
         </aside>
       </section>

@@ -21,6 +21,7 @@ test("next availability chooses the earliest clock time across professionals", (
     holidayDates: new Set(),
     occupiedSlots: occupied,
     providerIds: ["ana-martins", "lucas-ferreira"],
+    now: new Date("2026-02-09T12:00:00.000Z"),
   });
 
   assert.deepEqual(result, {
@@ -30,12 +31,45 @@ test("next availability chooses the earliest clock time across professionals", (
   });
 });
 
+test("next availability skips slots that already started today", () => {
+  const result = findNextAvailableSlot({
+    fromDate: "2026-09-14",
+    holidayDates: new Set(),
+    occupiedSlots: new Set(),
+    providerIds: ["ana-martins"],
+    now: new Date("2026-09-14T17:20:00.000Z"),
+  });
+
+  assert.deepEqual(result, {
+    date: "2026-09-14",
+    providerId: "ana-martins",
+    startTime: "15:00",
+  });
+});
+
+test("next availability never searches before the current local date", () => {
+  const result = findNextAvailableSlot({
+    fromDate: "2026-09-10",
+    holidayDates: new Set(),
+    occupiedSlots: new Set(),
+    providerIds: ["ana-martins"],
+    now: new Date("2026-09-14T17:20:00.000Z"),
+  });
+
+  assert.deepEqual(result, {
+    date: "2026-09-14",
+    providerId: "ana-martins",
+    startTime: "15:00",
+  });
+});
+
 test("next availability skips weekends and holidays", () => {
   const result = findNextAvailableSlot({
     fromDate: "2026-12-25",
     holidayDates: new Set(["2026-12-25"]),
     occupiedSlots: new Set(),
     providerIds: ["ana-martins"],
+    now: new Date("2026-12-24T12:00:00.000Z"),
   });
 
   assert.deepEqual(result, {
@@ -63,6 +97,7 @@ test("next availability returns null when the year has no remaining slot", () =>
     holidayDates: new Set(),
     occupiedSlots: occupied,
     providerIds: ["ana-martins"],
+    now: new Date("2026-12-30T12:00:00.000Z"),
   });
 
   assert.equal(result, null);

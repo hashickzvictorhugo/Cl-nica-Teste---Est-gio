@@ -1,43 +1,119 @@
-# Clínica Teste - agendamento full stack
+# Clínica Teste — Agendamento Full Stack
 
-Aplicação web para consultar horários e criar agendamentos de uma clínica. O projeto implementa o fluxo completo do teste técnico: o frontend consulta o backend, o backend verifica os feriados brasileiros na Nager.Date, valida as regras de negócio e persiste a reserva em SQLite/D1.
+[![CI](https://github.com/hashickzvictorhugo/Cl-nica-Teste---Est-gio/actions/workflows/ci.yml/badge.svg)](https://github.com/hashickzvictorhugo/Cl-nica-Teste---Est-gio/actions/workflows/ci.yml)
 
-## Funcionalidades
+Sistema web de agendamento desenvolvido para o desafio técnico de Estágio Full Stack. O usuário escolhe uma data, consulta horários disponíveis e confirma uma consulta. O backend valida dias úteis e feriados nacionais de 2026, impede conflitos de horário e persiste os agendamentos em SQLite/Cloudflare D1.
 
-- consulta de disponibilidade por data;
-- dez horários de uma hora, das 08:00 às 17:00, com fechamento às 18:00;
-- bloqueio de sábados, domingos, feriados e horários ocupados;
-- confirmação com nome do paciente e protocolo;
-- lista persistida de agendamentos;
-- mensagens específicas para feriado, fim de semana, agenda cheia, conflito e indisponibilidade externa;
-- interface responsiva e acessível em português;
-- WebMCP para consultar horários e criar agendamentos pela mesma jornada da interface.
+## Requisitos do desafio
 
-## Stack e arquitetura
+| Requisito | Implementação |
+| --- | --- |
+| Escolher uma data | Seletor de data no frontend |
+| Exibir horários disponíveis | `GET /available?date=AAAA-MM-DD` |
+| Criar agendamento | `POST /appointments` |
+| Listar agendamentos | `GET /appointments` |
+| Bloquear finais de semana | Validação no backend |
+| Bloquear feriados | Nager.Date consumida exclusivamente no backend |
+| Bloquear horários ocupados | Consulta de disponibilidade + índice único no banco |
+| Horário 08:00–18:00 | 10 slots de 1 hora, com último início às 17:00 |
+| Persistência | Cloudflare D1 / SQLite com Drizzle ORM |
+| Dados de data e fuso | Dia da semana + `America/Sao_Paulo` retornados pela API e exibidos na interface |
 
-- **Frontend:** React 19, TypeScript, Vinext e Tailwind CSS.
-- **Backend:** Route Handlers REST executados em Cloudflare Workers.
-- **Banco:** Cloudflare D1 (SQLite) com Drizzle ORM.
-- **API externa:** Nager.Date, consumida exclusivamente pelo backend.
-- **Testes:** runner nativo do Node.js e SQLite em memória.
+## Stack
+
+- **Frontend:** React 19 + TypeScript + Vinext/Vite
+- **Backend:** Route Handlers REST
+- **Banco:** Cloudflare D1 (SQLite) + Drizzle ORM
+- **API externa:** [Nager.Date](https://date.nager.at/api/v3/PublicHolidays/2026/BR)
+- **Testes:** Node.js Test Runner + SQLite em memória
+- **Qualidade:** ESLint, TypeScript e GitHub Actions
+
+## Arquitetura
 
 ```text
-Navegador
-  ├─ GET /available?date=2026-02-10
-  ├─ POST /appointments
-  └─ GET /appointments
+Frontend
+  │
+  ├── GET /available?date=2026-02-10
+  ├── POST /appointments
+  └── GET /appointments
           │
           ▼
-Backend / regras de agenda
-  ├─ Nager.Date (feriados BR de 2026)
-  └─ D1 / SQLite (agendamentos)
+Backend / regras de negócio
+  ├── Nager.Date → feriados BR de 2026
+  └── D1 / SQLite → agendamentos
 ```
 
-O índice único `(appointment_date, start_time)` é a proteção definitiva contra duas reservas concorrentes para o mesmo horário. A lista de feriados fica em cache no processo por seis horas; se a verificação externa falhar, o sistema falha fechado e não cria uma reserva sem validar o dia.
+O frontend nunca consulta a API de feriados diretamente. A validação é refeita no `POST`, evitando que um usuário contorne as regras pelo navegador.
 
-## Como executar
+## Regras de negócio
 
-Pré-requisitos: Node.js 22.13 ou superior e pnpm 11.
+- atendimento de segunda a sexta-feira;
+- funcionamento das **08:00 às 18:00**;
+- consultas de **1 hora**;
+- horários de início permitidos: `08:00` até `17:00`;
+- feriados nacionais de 2026 e finais de semana são bloqueados;
+- horários já ocupados não podem ser reservados novamente;
+- o nome do paciente é normalizado e limitado a 2–80 caracteres;
+- datas são tratadas como `AAAA-MM-DD`, evitando deslocamentos de dia por fuso horário;
+- fuso de referência: `America/Sao_Paulo`.
+
+### Concorrência
+
+A disponibilidade exibida no frontend não é considerada garantia de reserva. No momento do `POST`, todas as regras são validadas novamente e o banco possui um índice único em `(appointment_date, start_time)`. Se duas requisições tentarem reservar o mesmo horário, apenas uma é persistida e a outra recebe `409 SLOT_TAKEN`.
+
+### Indisponibilidade da API externa
+
+A lista de feriados fica em cache por seis horas. Caso a Nager.Date esteja indisponível, o sistema **falha fechado**: retorna `503` e não cria um agendamento sem conseguir validar o dia.
+
+## Endpoints
+
+### `GET /available?date=2026-02-10`
+
+Retorna a data, dia da semana, fuso horário, horário de funcionamento e todos os slots com seu estado de disponibilidade.
+
+```json
+{
+  "date": "2026-02-10",
+  "timezone": "America/Sao_Paulo",
+  "weekday": "terça-feira",
+  "isBusinessDay": true,
+  "blockedReason": null,
+  "holiday": null,
+  "businessHours": {
+    "opensAt": "08:00",
+    "closesAt": "18:00",
+    "durationMinutes": 60
+  },
+  "slots": [
+    { "startTime": "08:00", "endTime": "09:00", "available": true }
+  ]
+}
+```
+
+Datas inválidas retornam `400`. Finais de semana e feriados retornam `200`, mas sem horários disponíveis. Falha na consulta de feriados retorna `503`.
+
+### `POST /appointments`
+
+```json
+{
+  "date": "2026-02-10",
+  "startTime": "09:00",
+  "patientName": "Maria Silva"
+}
+```
+
+Uma reserva válida retorna `201`. Horário já reservado retorna `409`.
+
+### `GET /appointments`
+
+Retorna até 100 agendamentos, ordenados por data, horário e criação.
+
+## Executando localmente
+
+### Pré-requisitos
+
+- Node.js **22.13+**
+- pnpm **11.19+**
 
 ```bash
 pnpm install
@@ -46,15 +122,17 @@ pnpm run db:local:migrate
 pnpm run dev
 ```
 
-Acesse `http://localhost:5173`. A migração local é idempotente e pode ser executada novamente com segurança.
+A aplicação fica disponível em `http://localhost:5173`.
 
-Para validar todo o projeto:
+## Validação
+
+Para executar todas as verificações:
 
 ```bash
 pnpm run check
 ```
 
-Também é possível executar as etapas separadamente:
+O comando executa, em sequência:
 
 ```bash
 pnpm run lint
@@ -63,46 +141,34 @@ pnpm run test
 pnpm run build
 ```
 
-## Endpoints REST
-
-### `GET /available?date=2026-02-10`
-
-Retorna dados da data, fuso, horário de funcionamento e todos os intervalos com o estado de disponibilidade.
-
-### `POST /appointments`
-
-Cria uma reserva válida após revalidar as regras no backend. Conflitos de horário retornam `409`.
-
-### `GET /appointments`
-
-Retorna até 100 agendamentos ordenados por data, horário e criação.
-
-## Regras e decisões
-
-- O ano aceito é 2026, pois a API obrigatória do enunciado é `https://date.nager.at/api/v3/PublicHolidays/2026/BR`.
-- `17:00` é o último início possível; a consulta termina às `18:00`.
-- Datas são validadas como `AAAA-MM-DD` sem conversões que possam deslocar o dia por fuso horário.
-- O fuso exibido e retornado é `America/Sao_Paulo`.
-- Todos os feriados devolvidos pelo endpoint obrigatório são bloqueados.
-- Não há autenticação ou cancelamento, porque não fazem parte do escopo mínimo solicitado.
+Os testes cobrem validação de datas, finais de semana, geração de slots, horários ocupados, normalização de nomes, resposta da API de feriados, cache e restrições de unicidade/horário do banco.
 
 ## Estrutura principal
 
 ```text
 app/
-  available/route.ts
-  appointments/route.ts
+  available/route.ts          # GET /available
+  appointments/route.ts       # GET e POST /appointments
   components/SchedulingApp.tsx
+
 db/
   index.ts
   schema.ts
+
 drizzle/
   0000_quick_leopardon.sql
+
 lib/
   api-response.ts
   holiday-service.ts
   scheduling.ts
+
 tests/
   database-schema.test.ts
+  holiday-service.test.ts
   scheduling.test.ts
 ```
+
+## Decisões de escopo
+
+O desafio solicita o fluxo mínimo de consulta e criação de agendamentos. Por isso, autenticação, edição e cancelamento de consultas não foram adicionados. A interface pede nomes fictícios para demonstração e não deve ser usada para armazenar dados reais de pacientes.

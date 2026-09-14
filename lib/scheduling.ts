@@ -58,6 +58,44 @@ export function getEndTime(startTime: SlotStart) {
   return `${String(Number(startTime.slice(0, 2)) + 1).padStart(2, "0")}:00`;
 }
 
+export function getSchedulingClock(now: Date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+
+  const read = (type: "year" | "month" | "day" | "hour" | "minute") => {
+    const value = parts.find((part) => part.type === type)?.value;
+    if (!value) throw new Error(`Missing ${type} while formatting scheduling clock`);
+    return value;
+  };
+
+  return {
+    date: `${read("year")}-${read("month")}-${read("day")}`,
+    time: `${read("hour")}:${read("minute")}`,
+  };
+}
+
+export function isPastDate(date: string, now: Date = new Date()) {
+  return date < getSchedulingClock(now).date;
+}
+
+export function hasSlotStarted(
+  date: string,
+  startTime: string,
+  now: Date = new Date(),
+) {
+  const current = getSchedulingClock(now);
+  if (date < current.date) return true;
+  if (date > current.date) return false;
+  return startTime <= current.time;
+}
+
 export function buildScheduleSlots(
   occupiedStartTimes: Iterable<string> = [],
   blocked = false,

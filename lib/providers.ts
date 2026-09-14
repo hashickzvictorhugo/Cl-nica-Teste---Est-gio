@@ -37,7 +37,7 @@ export const PROVIDERS = [
   },
 ] as const satisfies readonly Provider[];
 
-export const DEFAULT_PROVIDER_ID = PROVIDERS[0].id;
+export const DEFAULT_PROVIDER_ID: string = PROVIDERS[0].id;
 
 export function getProviderById(value: unknown): Provider | null {
   if (typeof value !== "string") return null;

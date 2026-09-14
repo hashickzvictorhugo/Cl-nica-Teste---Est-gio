@@ -11,7 +11,6 @@ function migration(name: string) {
 function database() {
   const db = new DatabaseSync(":memory:");
   db.exec(migration("0000_quick_leopardon.sql"));
-  db.exec(migration("0001_add_patient_phone.sql"));
   db.exec(migration("0002_add_provider_schedule.sql"));
   return db;
 }

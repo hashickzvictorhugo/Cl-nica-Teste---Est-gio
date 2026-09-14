@@ -237,29 +237,44 @@ export function SchedulingApp() {
   }, []);
 
   useEffect(() => {
-    void loadDateAvailability(date);
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void loadDateAvailability(date);
+    });
+    return () => {
+      active = false;
+    };
   }, [date, loadDateAvailability]);
 
   useEffect(() => {
-    void loadAppointments();
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void loadAppointments();
+    });
+    return () => {
+      active = false;
+    };
   }, [loadAppointments]);
 
   useEffect(() => {
-    setSlot("");
-  }, [date, providerId]);
-
-  useEffect(() => {
     if (!pendingSuggestion) return;
-    const suggestedAvailability = availabilityByProvider[pendingSuggestion.providerId];
-    if (
-      suggestedAvailability?.date === pendingSuggestion.date &&
-      suggestedAvailability.slots.some(
-        (item) => item.startTime === pendingSuggestion.startTime && item.available,
-      )
-    ) {
-      setSlot(pendingSuggestion.startTime);
-      setPendingSuggestion(null);
-    }
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      const suggestedAvailability = availabilityByProvider[pendingSuggestion.providerId];
+      if (
+        suggestedAvailability?.date === pendingSuggestion.date &&
+        suggestedAvailability.slots.some(
+          (item) => item.startTime === pendingSuggestion.startTime && item.available,
+        )
+      ) {
+        setSlot(pendingSuggestion.startTime);
+        setPendingSuggestion(null);
+      }
+    });
+    return () => {
+      active = false;
+    };
   }, [availabilityByProvider, pendingSuggestion]);
 
   async function findNextAvailability() {
@@ -269,6 +284,7 @@ export function SchedulingApp() {
       const next = await json<NextAvailability>(
         `/next-available?fromDate=${encodeURIComponent(date)}&providerId=all`,
       );
+      setSlot("");
       setPendingSuggestion({
         date: next.date,
         providerId: next.provider.id,
@@ -487,7 +503,10 @@ export function SchedulingApp() {
                   aria-checked={selected}
                   className={selected ? "provider-card selected" : "provider-card"}
                   key={provider.id}
-                  onClick={() => setProviderId(provider.id)}
+                  onClick={() => {
+                    setProviderId(provider.id);
+                    setSlot("");
+                  }}
                   role="radio"
                   type="button"
                 >
@@ -524,7 +543,10 @@ export function SchedulingApp() {
             min="2026-01-01"
             max="2026-12-31"
             value={date}
-            onChange={(event) => setDate(event.target.value)}
+            onChange={(event) => {
+              setDate(event.target.value);
+              setSlot("");
+            }}
           />
           <div className="date-meta" aria-live="polite">
             <span className="meta-pill">{availability?.weekday ?? "Consultando data…"}</span>

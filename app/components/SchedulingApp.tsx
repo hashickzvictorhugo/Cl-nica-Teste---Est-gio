@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type Slot = { startTime: string; endTime: string; available: boolean };
 type Availability = {
@@ -18,6 +18,7 @@ type Appointment = {
   startTime: string;
   endTime: string;
   patientName: string;
+  patientPhone: string;
 };
 type ApiErrorPayload = {
   error?: {
@@ -38,6 +39,17 @@ function today2026() {
   return value.startsWith("2026-") ? value : "2026-02-10";
 }
 
+function formatPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 11) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return digits;
+}
+
 async function json<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
   const data: unknown = await response.json();
@@ -53,9 +65,11 @@ export function SchedulingApp() {
   const [availability, setAvailability] = useState<Availability | null>(null);
   const [slot, setSlot] = useState<string>("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string>("");
   const [message, setMessage] = useState<string>("");
   const [error, setError] = useState<string>("");
 
@@ -103,12 +117,18 @@ export function SchedulingApp() {
       const created = await json<{ appointment: Appointment }>("/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, startTime: slot, patientName: name }),
+        body: JSON.stringify({
+          date,
+          startTime: slot,
+          patientName: name,
+          patientPhone: phone,
+        }),
       });
       setMessage(
         `Agendamento confirmado. Protocolo ${created.appointment.id.slice(0, 8).toUpperCase()}.`,
       );
       setName("");
+      setPhone("");
       setSlot("");
       await Promise.all([loadAvailability(date), loadAppointments()]);
     } catch (err) {
@@ -118,6 +138,35 @@ export function SchedulingApp() {
       setSaving(false);
     }
   }
+
+  async function cancelAppointment(appointment: Appointment) {
+    const confirmed = window.confirm(
+      `Cancelar a consulta de ${appointment.patientName} em ${appointment.date} às ${appointment.startTime}?`,
+    );
+    if (!confirmed) return;
+
+    setCancellingId(appointment.id);
+    setError("");
+    setMessage("");
+    try {
+      await json<{ message: string }>(
+        `/appointments?id=${encodeURIComponent(appointment.id)}`,
+        { method: "DELETE" },
+      );
+      setMessage("Agendamento cancelado com sucesso.");
+      await Promise.all([loadAvailability(date), loadAppointments()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao cancelar agendamento.");
+    } finally {
+      setCancellingId("");
+    }
+  }
+
+  const selectedDateAppointments = useMemo(
+    () => appointments.filter((item) => item.date === date).length,
+    [appointments, date],
+  );
+  const availableSlots = availability?.slots.filter((item) => item.available).length ?? 0;
 
   const blocked = availability?.blockedReason;
   const dayStatus = !availability
@@ -203,7 +252,7 @@ export function SchedulingApp() {
           <div className="divider" />
           <div className="section-heading">
             <span>3</span>
-            <div><h2>Confirme seus dados</h2><p>Use um nome fictício para testar o projeto.</p></div>
+            <div><h2>Confirme seus dados</h2><p>Use dados fictícios para testar o projeto.</p></div>
           </div>
           <label className="field-label" htmlFor="patient-name">Nome do paciente</label>
           <input
@@ -217,6 +266,20 @@ export function SchedulingApp() {
             placeholder="Ex.: Maria Silva"
             required
             value={name}
+          />
+
+          <label className="field-label" htmlFor="patient-phone">Telefone / WhatsApp <span className="optional">opcional</span></label>
+          <input
+            aria-label="Telefone ou WhatsApp do paciente"
+            autoComplete="tel"
+            className="phone-input"
+            id="patient-phone"
+            inputMode="tel"
+            maxLength={20}
+            onChange={(event) => setPhone(event.target.value)}
+            placeholder="Ex.: (18) 99999-9999"
+            type="tel"
+            value={phone}
           />
 
           {error ? <div className="error" role="alert">{error}</div> : null}
@@ -236,6 +299,13 @@ export function SchedulingApp() {
             <div><h2>Na agenda</h2><p>Consultas confirmadas</p></div>
             <strong>{appointments.length}</strong>
           </div>
+
+          <div className="metrics" aria-label="Resumo da agenda">
+            <div><strong>{selectedDateAppointments}</strong><span>no dia</span></div>
+            <div><strong>{availableSlots}</strong><span>horários livres</span></div>
+            <div><strong>{appointments.length}</strong><span>no total</span></div>
+          </div>
+
           {appointments.length === 0 ? (
             <div className="empty">Nenhuma consulta marcada ainda.</div>
           ) : (
@@ -243,7 +313,20 @@ export function SchedulingApp() {
               {appointments.map((item) => (
                 <li key={item.id}>
                   <div className="appointment-date">{item.date.slice(8, 10)}<small>{item.date.slice(5, 7)}/26</small></div>
-                  <div><strong>{item.startTime}–{item.endTime}</strong><span>{item.patientName}</span></div>
+                  <div className="appointment-info">
+                    <strong>{item.startTime}–{item.endTime}</strong>
+                    <span>{item.patientName}</span>
+                    {item.patientPhone ? <small>{formatPhone(item.patientPhone)}</small> : null}
+                  </div>
+                  <button
+                    aria-label={`Cancelar consulta de ${item.patientName}`}
+                    className="cancel-button"
+                    disabled={cancellingId === item.id}
+                    onClick={() => void cancelAppointment(item)}
+                    type="button"
+                  >
+                    {cancellingId === item.id ? "..." : "Cancelar"}
+                  </button>
                 </li>
               ))}
             </ol>

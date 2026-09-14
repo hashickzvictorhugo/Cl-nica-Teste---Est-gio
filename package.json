@@ -8,6 +8,10 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "pnpm run build && wrangler deploy",
+    "db:remote:migrate": "wrangler d1 execute DB --remote --config dist/server/wrangler.json --file drizzle/0000_quick_leopardon.sql --yes",
+    "release": "pnpm run deploy && pnpm run db:remote:migrate",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "node --experimental-strip-types --test tests/*.test.ts",

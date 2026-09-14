@@ -1,0 +1,88 @@
+name: Production Smoke Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BASE_URL: https://clinica-teste-agendamentos.hashickzvictorhugo.workers.dev
+      TEST_DATE: "2026-12-30"
+      WEEKEND_DATE: "2026-12-27"
+
+    steps:
+      - name: Check homepage
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --retry 5 --retry-delay 3 --retry-all-errors -fsS "$BASE_URL/" -o /tmp/home.html
+          test -s /tmp/home.html
+
+      - name: Check availability API
+        id: availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --retry 5 --retry-delay 3 --retry-all-errors -fsS "$BASE_URL/available?date=$TEST_DATE" -o /tmp/available.json
+          cat /tmp/available.json
+          jq -e '.date == env.TEST_DATE' /tmp/available.json
+          jq -e '.isBusinessDay == true' /tmp/available.json
+          SLOT="$(jq -r '.slots[] | select(.available == true) | .startTime' /tmp/available.json | head -n 1)"
+          test -n "$SLOT"
+          echo "slot=$SLOT" >> "$GITHUB_OUTPUT"
+
+      - name: Create appointment and verify persistence
+        id: create
+        shell: bash
+        env:
+          SLOT: ${{ steps.availability.outputs.slot }}
+        run: |
+          set -euo pipefail
+          PATIENT="Production Smoke Test ${GITHUB_RUN_ID}"
+          PAYLOAD="$(jq -nc --arg date "$TEST_DATE" --arg startTime "$SLOT" --arg patientName "$PATIENT" '{date:$date,startTime:$startTime,patientName:$patientName}')"
+          STATUS="$(curl -sS -o /tmp/create.json -w '%{http_code}' -H 'content-type: application/json' -d "$PAYLOAD" "$BASE_URL/appointments")"
+          cat /tmp/create.json
+          test "$STATUS" = "201"
+          ID="$(jq -r '.appointment.id' /tmp/create.json)"
+          test -n "$ID"
+          echo "appointment_id=$ID" >> "$GITHUB_OUTPUT"
+          echo "patient=$PATIENT" >> "$GITHUB_OUTPUT"
+
+          curl -fsS "$BASE_URL/appointments" -o /tmp/list.json
+          jq -e --arg id "$ID" '.appointments | any(.id == $id)' /tmp/list.json
+
+      - name: Verify duplicate slot protection
+        shell: bash
+        env:
+          SLOT: ${{ steps.availability.outputs.slot }}
+        run: |
+          set -euo pipefail
+          PAYLOAD="$(jq -nc --arg date "$TEST_DATE" --arg startTime "$SLOT" --arg patientName "Duplicate Smoke Test" '{date:$date,startTime:$startTime,patientName:$patientName}')"
+          STATUS="$(curl -sS -o /tmp/duplicate.json -w '%{http_code}' -H 'content-type: application/json' -d "$PAYLOAD" "$BASE_URL/appointments")"
+          cat /tmp/duplicate.json
+          test "$STATUS" = "409"
+          jq -e '.error.code == "SLOT_TAKEN"' /tmp/duplicate.json
+
+      - name: Verify weekend blocking
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS "$BASE_URL/available?date=$WEEKEND_DATE" -o /tmp/weekend.json
+          cat /tmp/weekend.json
+          jq -e '.date == env.WEEKEND_DATE' /tmp/weekend.json
+          jq -e '.isBusinessDay == false' /tmp/weekend.json
+          jq -e '[.slots[] | select(.available == true)] | length == 0' /tmp/weekend.json
+
+      - name: Verify invalid date validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl -sS -o /tmp/invalid.json -w '%{http_code}' "$BASE_URL/available?date=2027-01-01")"
+          cat /tmp/invalid.json
+          test "$STATUS" = "400"
+          jq -e '.error.code == "INVALID_DATE"' /tmp/invalid.json

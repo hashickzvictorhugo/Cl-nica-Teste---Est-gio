@@ -1,5 +1,11 @@
 import { PROVIDERS } from "./providers.ts";
-import { isWeekend, SLOT_STARTS, type SlotStart } from "./scheduling.ts";
+import {
+  getSchedulingClock,
+  hasSlotStarted,
+  isWeekend,
+  SLOT_STARTS,
+  type SlotStart,
+} from "./scheduling.ts";
 
 export type NextAvailability = {
   date: string;
@@ -31,18 +37,22 @@ export function findNextAvailableSlot({
   occupiedSlots,
   providerIds = PROVIDERS.map((provider) => provider.id),
   endDate = "2026-12-31",
+  now = new Date(),
 }: {
   fromDate: string;
   holidayDates: ReadonlySet<string>;
   occupiedSlots: ReadonlySet<string>;
   providerIds?: readonly string[];
   endDate?: string;
+  now?: Date;
 }): NextAvailability | null {
-  let date = fromDate;
+  const currentDate = getSchedulingClock(now).date;
+  let date = fromDate < currentDate ? currentDate : fromDate;
 
   while (date <= endDate) {
     if (!isWeekend(date) && !holidayDates.has(date)) {
       for (const startTime of SLOT_STARTS) {
+        if (hasSlotStarted(date, startTime, now)) continue;
         for (const providerId of providerIds) {
           if (!occupiedSlots.has(appointmentSlotKey(providerId, date, startTime))) {
             return { date, providerId, startTime };

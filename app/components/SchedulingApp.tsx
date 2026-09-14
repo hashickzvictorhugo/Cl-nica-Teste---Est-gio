@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 type Slot = { startTime: string; endTime: string; available: boolean };
 type Availability = {
   date: string;
+  timezone: string;
   weekday: string;
   isBusinessDay: boolean;
   blockedReason: "WEEKEND" | "HOLIDAY" | null;
@@ -86,12 +87,14 @@ export function SchedulingApp() {
     setError("");
     setMessage("");
     try {
-      await json("/appointments", {
+      const created = await json<{ appointment: Appointment }>("/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date, startTime: slot, patientName: name }),
       });
-      setMessage("Agendamento confirmado com sucesso.");
+      setMessage(
+        `Agendamento confirmado. Protocolo ${created.appointment.id.slice(0, 8).toUpperCase()}.`,
+      );
       setName("");
       setSlot("");
       await Promise.all([loadAvailability(date), loadAppointments()]);
@@ -104,6 +107,13 @@ export function SchedulingApp() {
   }
 
   const blocked = availability?.blockedReason;
+  const dayStatus = !availability
+    ? "Consultando"
+    : blocked === "WEEKEND"
+      ? "Fim de semana"
+      : blocked === "HOLIDAY"
+        ? "Feriado"
+        : "Dia útil";
 
   return (
     <main className="page-shell">
@@ -138,6 +148,13 @@ export function SchedulingApp() {
             value={date}
             onChange={(event) => setDate(event.target.value)}
           />
+          <div className="date-meta" aria-live="polite">
+            <span className="meta-pill">{availability?.weekday ?? "Consultando data…"}</span>
+            <span className="meta-pill">
+              {availability?.timezone ?? "America/Sao_Paulo"} · Horário de Brasília
+            </span>
+            <span className={blocked ? "meta-pill blocked" : "meta-pill ok"}>{dayStatus}</span>
+          </div>
 
           <div className="divider" />
           <div className="section-heading">
@@ -175,18 +192,22 @@ export function SchedulingApp() {
             <span>3</span>
             <div><h2>Confirme seus dados</h2><p>Use um nome fictício para testar o projeto.</p></div>
           </div>
+          <label className="field-label" htmlFor="patient-name">Nome do paciente</label>
           <input
+            aria-label="Nome do paciente"
+            autoComplete="name"
             className="name-input"
+            id="patient-name"
             maxLength={80}
             minLength={2}
             onChange={(event) => setName(event.target.value)}
-            placeholder="Nome do paciente"
+            placeholder="Ex.: Maria Silva"
             required
             value={name}
           />
 
-          {error ? <div className="error">{error}</div> : null}
-          {message ? <div className="success">{message}</div> : null}
+          {error ? <div className="error" role="alert">{error}</div> : null}
+          {message ? <div className="success" role="status">{message}</div> : null}
 
           <button
             className="submit"

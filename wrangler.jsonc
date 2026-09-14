@@ -6,7 +6,9 @@
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
-      "binding": "DB"
+      "binding": "DB",
+      "database_name": "clinica-teste-agendamentos-db",
+      "database_id": "d48639e8-bc39-4138-87eb-4b68230300d0"
     }
   ]
 }

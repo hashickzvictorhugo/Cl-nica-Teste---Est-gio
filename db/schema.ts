@@ -7,12 +7,14 @@ export const appointments = sqliteTable(
     id: text("id").primaryKey(),
     appointmentDate: text("appointment_date").notNull(),
     startTime: text("start_time").notNull(),
+    providerId: text("provider_id").notNull().default("ana-martins"),
     patientName: text("patient_name").notNull(),
     patientPhone: text("patient_phone"),
     createdAt: text("created_at").notNull(),
   },
   (table) => [
-    uniqueIndex("appointments_date_start_time_unique").on(
+    uniqueIndex("appointments_provider_date_start_time_unique").on(
+      table.providerId,
       table.appointmentDate,
       table.startTime,
     ),

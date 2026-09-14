@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildScheduleSlots, getEndTime, getSchedulingClock, getWeekdayLabel,
-  hasSlotStarted, isPastDate, isSupportedDate, isValidStartTime,
-  isWeekend, parseIsoDate, sanitizePatientName, sanitizePatientPhone,
-  SLOT_STARTS,
+  hasSlotEnded, hasSlotStarted, isPastDate, isSupportedDate,
+  isValidStartTime, isWeekend, parseIsoDate, sanitizePatientName,
+  sanitizePatientPhone, SLOT_STARTS,
 } from "../lib/scheduling.ts";
 
 test("accepts real dates from 2026 and rejects unsupported dates", () => {
@@ -36,6 +36,15 @@ test("rejects past dates and slots that already started today", () => {
   assert.equal(hasSlotStarted("2026-09-14", "14:00", now), true);
   assert.equal(hasSlotStarted("2026-09-14", "15:00", now), false);
   assert.equal(hasSlotStarted("2026-09-15", "08:00", now), false);
+});
+
+test("only considers a consultation finished after its one-hour slot ends", () => {
+  const during = new Date("2026-09-14T17:20:00.000Z");
+  const after = new Date("2026-09-14T18:00:00.000Z");
+  assert.equal(hasSlotEnded("2026-09-14", "14:00", during), false);
+  assert.equal(hasSlotEnded("2026-09-14", "14:00", after), true);
+  assert.equal(hasSlotEnded("2026-09-13", "17:00", during), true);
+  assert.equal(hasSlotEnded("2026-09-15", "08:00", during), false);
 });
 
 test("creates the ten one-hour slots", () => {

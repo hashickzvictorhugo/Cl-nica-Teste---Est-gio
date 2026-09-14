@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./provider.css";
 
 export const metadata: Metadata = {
-  title: "Clínica Teste | Agendamento online",
-  description: "Sistema full stack para consulta de horários e agendamento de consultas.",
+  title: "Garde Agenda | Agendamento inteligente",
+  description: "Case técnico Full Stack com disponibilidade por profissional, regras de agenda e persistência em banco de dados.",
   icons: { icon: "/favicon.svg" },
 };
 

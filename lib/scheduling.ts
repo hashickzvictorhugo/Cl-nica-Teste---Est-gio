@@ -75,3 +75,10 @@ export function sanitizePatientName(value: unknown) {
   const normalized = value.trim().replace(/\s+/g, " ");
   return normalized.length >= 2 && normalized.length <= 80 ? normalized : null;
 }
+
+export function sanitizePatientPhone(value: unknown) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value !== "string") return null;
+  const digits = value.replace(/\D/g, "");
+  return digits.length >= 8 && digits.length <= 13 ? digits : null;
+}

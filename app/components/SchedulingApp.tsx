@@ -76,8 +76,15 @@ export function SchedulingApp() {
   }, []);
 
   useEffect(() => {
-    void loadAvailability(date);
-    void loadAppointments().catch(() => undefined);
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      void loadAvailability(date);
+      void loadAppointments().catch(() => undefined);
+    });
+    return () => {
+      active = false;
+    };
   }, [date, loadAppointments, loadAvailability]);
 
   async function submit(event: FormEvent) {

@@ -21,6 +21,20 @@ Aplicação web para consultar horários e criar agendamentos de uma clínica. O
 - **API externa:** Nager.Date, consumida exclusivamente pelo backend.
 - **Testes:** runner nativo do Node.js e SQLite em memória.
 
+```text
+Navegador
+  ├─ GET /available?date=2026-02-10
+  ├─ POST /appointments
+  └─ GET /appointments
+          │
+          ▼
+Backend / regras de agenda
+  ├─ Nager.Date (feriados BR de 2026)
+  └─ D1 / SQLite (agendamentos)
+```
+
+O índice único `(appointment_date, start_time)` é a proteção definitiva contra duas reservas concorrentes para o mesmo horário. A lista de feriados fica em cache no processo por seis horas; se a verificação externa falhar, o sistema falha fechado e não cria uma reserva sem validar o dia.
+
 ## Como executar
 
 Pré-requisitos: Node.js 22.13 ou superior e pnpm 11.
@@ -32,7 +46,7 @@ pnpm run db:local:migrate
 pnpm run dev
 ```
 
-Acesse `http://localhost:5173`.
+Acesse `http://localhost:5173`. A migração local é idempotente e pode ser executada novamente com segurança.
 
 Para validar todo o projeto:
 
@@ -40,20 +54,37 @@ Para validar todo o projeto:
 pnpm run check
 ```
 
+Também é possível executar as etapas separadamente:
+
+```bash
+pnpm run lint
+pnpm run typecheck
+pnpm run test
+pnpm run build
+```
+
 ## Endpoints REST
 
-- `GET /available?date=2026-02-10`
-- `POST /appointments`
-- `GET /appointments`
+### `GET /available?date=2026-02-10`
 
-## Regras principais
+Retorna dados da data, fuso, horário de funcionamento e todos os intervalos com o estado de disponibilidade.
 
-- atendimento de segunda a sexta;
-- dez horários de uma hora, com início entre 08:00 e 17:00;
-- bloqueio de feriados nacionais de 2026;
-- prevenção de reservas concorrentes para o mesmo horário;
-- fuso `America/Sao_Paulo`;
-- respostas de erro padronizadas no backend.
+### `POST /appointments`
+
+Cria uma reserva válida após revalidar as regras no backend. Conflitos de horário retornam `409`.
+
+### `GET /appointments`
+
+Retorna até 100 agendamentos ordenados por data, horário e criação.
+
+## Regras e decisões
+
+- O ano aceito é 2026, pois a API obrigatória do enunciado é `https://date.nager.at/api/v3/PublicHolidays/2026/BR`.
+- `17:00` é o último início possível; a consulta termina às `18:00`.
+- Datas são validadas como `AAAA-MM-DD` sem conversões que possam deslocar o dia por fuso horário.
+- O fuso exibido e retornado é `America/Sao_Paulo`.
+- Todos os feriados devolvidos pelo endpoint obrigatório são bloqueados.
+- Não há autenticação ou cancelamento, porque não fazem parte do escopo mínimo solicitado.
 
 ## Estrutura principal
 

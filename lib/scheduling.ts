@@ -1,0 +1,77 @@
+export const SCHEDULING_YEAR = 2026;
+export const TIMEZONE = "America/Sao_Paulo";
+export const BUSINESS_HOURS = {
+  opensAt: "08:00",
+  closesAt: "18:00",
+  durationMinutes: 60,
+} as const;
+
+export const SLOT_STARTS = [
+  "08:00", "09:00", "10:00", "11:00", "12:00",
+  "13:00", "14:00", "15:00", "16:00", "17:00",
+] as const;
+
+export type SlotStart = (typeof SLOT_STARTS)[number];
+export type ScheduleSlot = { startTime: SlotStart; endTime: string; available: boolean };
+
+const WEEKDAYS_PT_BR = [
+  "domingo", "segunda-feira", "terça-feira", "quarta-feira",
+  "quinta-feira", "sexta-feira", "sábado",
+] as const;
+
+export function parseIsoDate(value: unknown) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() !== month - 1 ||
+    candidate.getUTCDate() !== day
+  ) return null;
+  return { year, month, day };
+}
+
+export function isSupportedDate(value: unknown): value is string {
+  return parseIsoDate(value)?.year === SCHEDULING_YEAR;
+}
+
+export function getUtcWeekday(date: string) {
+  const parsed = parseIsoDate(date);
+  if (!parsed) throw new Error("Invalid ISO date");
+  return new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day)).getUTCDay();
+}
+
+export function isWeekend(date: string) {
+  const weekday = getUtcWeekday(date);
+  return weekday === 0 || weekday === 6;
+}
+
+export function getWeekdayLabel(date: string) {
+  return WEEKDAYS_PT_BR[getUtcWeekday(date)];
+}
+
+export function isValidStartTime(value: unknown): value is SlotStart {
+  return typeof value === "string" && SLOT_STARTS.includes(value as SlotStart);
+}
+
+export function getEndTime(startTime: SlotStart) {
+  return `${String(Number(startTime.slice(0, 2)) + 1).padStart(2, "0")}:00`;
+}
+
+export function buildScheduleSlots(
+  occupiedStartTimes: Iterable<string> = [],
+  blocked = false,
+): ScheduleSlot[] {
+  const occupied = new Set(occupiedStartTimes);
+  return SLOT_STARTS.map((startTime) => ({
+    startTime,
+    endTime: getEndTime(startTime),
+    available: !blocked && !occupied.has(startTime),
+  }));
+}
+
+export function sanitizePatientName(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().replace(/\s+/g, " ");
+  return normalized.length >= 2 && normalized.length <= 80 ? normalized : null;
+}

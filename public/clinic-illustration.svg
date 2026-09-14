@@ -1,31 +1,37 @@
 <svg width="720" height="420" viewBox="0 0 720 420" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="panel" x1="120" y1="40" x2="600" y2="380" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#EAF6F2"/>
-      <stop offset="1" stop-color="#D9EEE8"/>
+      <stop stop-color="#173154"/>
+      <stop offset="1" stop-color="#0A1830"/>
     </linearGradient>
     <linearGradient id="accent" x1="250" y1="90" x2="500" y2="320" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#2E8A78"/>
-      <stop offset="1" stop-color="#146C5B"/>
+      <stop stop-color="#56D8FF"/>
+      <stop offset=".52" stop-color="#4975FF"/>
+      <stop offset="1" stop-color="#7768FF"/>
     </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <circle cx="560" cy="86" r="72" fill="#DDF1EB"/>
-  <circle cx="134" cy="332" r="54" fill="#E8F5F1"/>
-  <rect x="144" y="56" width="430" height="304" rx="42" fill="url(#panel)" stroke="#CAE2DB" stroke-width="2"/>
-  <rect x="202" y="104" width="312" height="208" rx="26" fill="white" stroke="#D5E7E1" stroke-width="2"/>
-  <rect x="235" y="140" width="94" height="18" rx="9" fill="#E6F3EF"/>
-  <rect x="235" y="177" width="246" height="14" rx="7" fill="#EEF6F3"/>
-  <rect x="235" y="205" width="205" height="14" rx="7" fill="#EEF6F3"/>
+  <circle cx="568" cy="82" r="74" fill="#172B50"/>
+  <circle cx="142" cy="332" r="58" fill="#102541"/>
+  <rect x="142" y="54" width="434" height="308" rx="42" fill="url(#panel)" stroke="#27486F" stroke-width="2"/>
+  <rect x="202" y="104" width="312" height="208" rx="26" fill="#0D2038" stroke="#315379" stroke-width="2"/>
+  <rect x="235" y="140" width="94" height="18" rx="9" fill="#183654"/>
+  <rect x="235" y="177" width="246" height="14" rx="7" fill="#17304A"/>
+  <rect x="235" y="205" width="205" height="14" rx="7" fill="#17304A"/>
   <rect x="235" y="248" width="108" height="38" rx="13" fill="url(#accent)"/>
-  <rect x="358" y="248" width="123" height="38" rx="13" fill="#EEF6F3" stroke="#D4E6E0"/>
-  <rect x="457" y="77" width="82" height="82" rx="24" fill="#146C5B"/>
-  <path d="M498 96V140M476 118H520" stroke="white" stroke-width="12" stroke-linecap="round"/>
-  <path d="M119 214C157 214 162 170 190 170C219 170 220 255 255 255C286 255 289 192 319 192C346 192 349 221 375 221" stroke="#2E8A78" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="118" cy="214" r="10" fill="#2E8A78"/>
-  <circle cx="375" cy="221" r="10" fill="#2E8A78"/>
-  <rect x="536" y="242" width="104" height="102" rx="28" fill="white" stroke="#D2E5DE" stroke-width="2"/>
-  <path d="M561 276H615M561 295H602M561 314H592" stroke="#B6D5CC" stroke-width="8" stroke-linecap="round"/>
-  <circle cx="184" cy="74" r="11" fill="#2E8A78"/>
-  <circle cx="618" cy="182" r="8" fill="#7DB9A9"/>
-  <circle cx="94" cy="286" r="7" fill="#A9D1C5"/>
+  <rect x="358" y="248" width="123" height="38" rx="13" fill="#132944" stroke="#2C4D71"/>
+  <rect x="457" y="77" width="82" height="82" rx="24" fill="url(#accent)" filter="url(#glow)"/>
+  <path d="M498 96V140M476 118H520" stroke="#081321" stroke-width="12" stroke-linecap="round"/>
+  <path d="M119 214C157 214 162 170 190 170C219 170 220 255 255 255C286 255 289 192 319 192C346 192 349 221 375 221" stroke="#56D8FF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="118" cy="214" r="10" fill="#56D8FF"/>
+  <circle cx="375" cy="221" r="10" fill="#7768FF"/>
+  <rect x="536" y="242" width="104" height="102" rx="28" fill="#0E2038" stroke="#315379" stroke-width="2"/>
+  <path d="M561 276H615M561 295H602M561 314H592" stroke="#4B7098" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="184" cy="74" r="11" fill="#58D7AC"/>
+  <circle cx="618" cy="182" r="8" fill="#7768FF"/>
+  <circle cx="94" cy="286" r="7" fill="#56D8FF"/>
+  <path d="M578 126C612 127 634 145 644 171" stroke="#315379" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 10"/>
 </svg>

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  buildScheduleSlots, getEndTime, getWeekdayLabel, isSupportedDate,
-  isValidStartTime, isWeekend, parseIsoDate, sanitizePatientName,
-  sanitizePatientPhone, SLOT_STARTS,
+  buildScheduleSlots, getEndTime, getSchedulingClock, getWeekdayLabel,
+  hasSlotStarted, isPastDate, isSupportedDate, isValidStartTime,
+  isWeekend, parseIsoDate, sanitizePatientName, sanitizePatientPhone,
+  SLOT_STARTS,
 } from "../lib/scheduling.ts";
 
 test("accepts real dates from 2026 and rejects unsupported dates", () => {
@@ -17,6 +18,24 @@ test("identifies weekends without timezone date shifts", () => {
   assert.equal(isWeekend("2026-02-14"), true);
   assert.equal(isWeekend("2026-02-10"), false);
   assert.equal(getWeekdayLabel("2026-02-10"), "terça-feira");
+});
+
+test("uses America/Sao_Paulo to determine the current scheduling clock", () => {
+  const now = new Date("2026-09-14T17:20:00.000Z");
+  assert.deepEqual(getSchedulingClock(now), {
+    date: "2026-09-14",
+    time: "14:20",
+  });
+});
+
+test("rejects past dates and slots that already started today", () => {
+  const now = new Date("2026-09-14T17:20:00.000Z");
+  assert.equal(isPastDate("2026-09-13", now), true);
+  assert.equal(isPastDate("2026-09-14", now), false);
+  assert.equal(isPastDate("2026-09-15", now), false);
+  assert.equal(hasSlotStarted("2026-09-14", "14:00", now), true);
+  assert.equal(hasSlotStarted("2026-09-14", "15:00", now), false);
+  assert.equal(hasSlotStarted("2026-09-15", "08:00", now), false);
 });
 
 test("creates the ten one-hour slots", () => {

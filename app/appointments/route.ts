@@ -1,7 +1,11 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, like, or } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { appointments } from "@/db/schema";
+import {
+  isAppointmentStatus,
+  type AppointmentStatus,
+} from "@/lib/appointment-status";
 import { databaseError, jsonError } from "@/lib/api-response";
 import {
   getHolidayForDate,
@@ -20,6 +24,10 @@ import {
 } from "@/lib/scheduling";
 
 export const dynamic = "force-dynamic";
+
+function normalizedStatus(value: string): AppointmentStatus {
+  return isAppointmentStatus(value) ? value : "CONFIRMED";
+}
 
 function presentAppointment(row: typeof appointments.$inferSelect) {
   const provider = getProviderById(row.providerId);
@@ -40,22 +48,75 @@ function presentAppointment(row: typeof appointments.$inferSelect) {
     },
     patientName: row.patientName,
     patientPhone: row.patientPhone ?? "",
+    status: normalizedStatus(row.status),
     createdAt: row.createdAt,
+    updatedAt: row.updatedAt ?? null,
+    cancelledAt: row.cancelledAt ?? null,
+    completedAt: row.completedAt ?? null,
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const date = url.searchParams.get("date")?.trim() ?? "";
+  const providerId = url.searchParams.get("providerId")?.trim() ?? "";
+  const status = url.searchParams.get("status")?.trim() ?? "";
+  const search = url.searchParams.get("q")?.trim().slice(0, 80) ?? "";
+
+  if (date && !isSupportedDate(date)) {
+    return jsonError(
+      400,
+      "INVALID_DATE",
+      `Informe uma data válida de ${SCHEDULING_YEAR} no formato AAAA-MM-DD.`,
+    );
+  }
+
+  if (providerId && providerId !== "all" && !getProviderById(providerId)) {
+    return jsonError(
+      400,
+      "INVALID_PROVIDER",
+      "Escolha um profissional válido para filtrar a agenda.",
+    );
+  }
+
+  if (status && status !== "all" && !isAppointmentStatus(status)) {
+    return jsonError(
+      400,
+      "INVALID_STATUS",
+      "Escolha um status válido para filtrar a agenda.",
+    );
+  }
+
+  const conditions = [];
+  if (date) conditions.push(eq(appointments.appointmentDate, date));
+  if (providerId && providerId !== "all") {
+    conditions.push(eq(appointments.providerId, providerId));
+  }
+  if (status && status !== "all" && isAppointmentStatus(status)) {
+    conditions.push(eq(appointments.status, status));
+  }
+  if (search) {
+    const pattern = `%${search}%`;
+    conditions.push(
+      or(
+        like(appointments.patientName, pattern),
+        like(appointments.patientPhone, pattern),
+      )!,
+    );
+  }
+
   try {
     const rows = await getDb()
       .select()
       .from(appointments)
+      .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(
         asc(appointments.appointmentDate),
         asc(appointments.providerId),
         asc(appointments.startTime),
         asc(appointments.createdAt),
       )
-      .limit(100);
+      .limit(200);
 
     return Response.json(
       {
@@ -150,6 +211,7 @@ export async function POST(request: Request) {
       );
     }
 
+    const now = new Date().toISOString();
     const values = {
       id: crypto.randomUUID(),
       appointmentDate: date,
@@ -157,19 +219,17 @@ export async function POST(request: Request) {
       providerId: provider.id,
       patientName,
       patientPhone: patientPhone || null,
-      createdAt: new Date().toISOString(),
+      status: "CONFIRMED",
+      createdAt: now,
+      updatedAt: now,
+      cancelledAt: null,
+      completedAt: null,
     };
 
     const created = await getDb()
       .insert(appointments)
       .values(values)
-      .onConflictDoNothing({
-        target: [
-          appointments.providerId,
-          appointments.appointmentDate,
-          appointments.startTime,
-        ],
-      })
+      .onConflictDoNothing()
       .returning();
 
     if (created.length === 0) {
@@ -202,6 +262,77 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  let payload: Record<string, unknown>;
+  try {
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      throw new Error("Expected a JSON object");
+    }
+    payload = body as Record<string, unknown>;
+  } catch {
+    return jsonError(400, "VALIDATION_ERROR", "Envie a atualização em JSON.");
+  }
+
+  const id = typeof payload.id === "string" ? payload.id.trim() : "";
+  const status = payload.status;
+
+  if (!id) {
+    return jsonError(400, "VALIDATION_ERROR", "Informe o agendamento que deseja atualizar.");
+  }
+
+  if (status !== "COMPLETED" && status !== "CONFIRMED") {
+    return jsonError(
+      400,
+      "INVALID_STATUS",
+      "A atualização permite marcar a consulta como concluída ou confirmada.",
+    );
+  }
+
+  try {
+    const current = await getDb()
+      .select()
+      .from(appointments)
+      .where(eq(appointments.id, id))
+      .limit(1);
+
+    if (current.length === 0) {
+      return jsonError(404, "APPOINTMENT_NOT_FOUND", "Agendamento não encontrado.");
+    }
+
+    if (normalizedStatus(current[0].status) === "CANCELLED") {
+      return jsonError(
+        409,
+        "INVALID_TRANSITION",
+        "Uma consulta cancelada permanece no histórico e não pode ser reativada.",
+      );
+    }
+
+    const now = new Date().toISOString();
+    const updated = await getDb()
+      .update(appointments)
+      .set({
+        status,
+        updatedAt: now,
+        completedAt: status === "COMPLETED" ? now : null,
+      })
+      .where(eq(appointments.id, id))
+      .returning();
+
+    return Response.json(
+      {
+        message: status === "COMPLETED"
+          ? "Consulta marcada como concluída."
+          : "Consulta marcada como confirmada.",
+        appointment: presentAppointment(updated[0]),
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    return databaseError(error);
+  }
+}
+
 export async function DELETE(request: Request) {
   const id = new URL(request.url).searchParams.get("id")?.trim();
   if (!id) {
@@ -209,17 +340,40 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    const removed = await getDb()
-      .delete(appointments)
+    const current = await getDb()
+      .select()
+      .from(appointments)
       .where(eq(appointments.id, id))
-      .returning({ id: appointments.id });
+      .limit(1);
 
-    if (removed.length === 0) {
+    if (current.length === 0) {
       return jsonError(404, "APPOINTMENT_NOT_FOUND", "Agendamento não encontrado.");
     }
 
+    if (normalizedStatus(current[0].status) === "CANCELLED") {
+      return Response.json(
+        { message: "Agendamento já estava cancelado.", appointment: presentAppointment(current[0]) },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    const now = new Date().toISOString();
+    const cancelled = await getDb()
+      .update(appointments)
+      .set({
+        status: "CANCELLED",
+        updatedAt: now,
+        cancelledAt: now,
+        completedAt: null,
+      })
+      .where(eq(appointments.id, id))
+      .returning();
+
     return Response.json(
-      { message: "Agendamento cancelado.", id },
+      {
+        message: "Agendamento cancelado e mantido no histórico.",
+        appointment: presentAppointment(cancelled[0]),
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

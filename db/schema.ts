@@ -8,6 +8,7 @@ export const appointments = sqliteTable(
     appointmentDate: text("appointment_date").notNull(),
     startTime: text("start_time").notNull(),
     patientName: text("patient_name").notNull(),
+    patientPhone: text("patient_phone"),
     createdAt: text("created_at").notNull(),
   },
   (table) => [

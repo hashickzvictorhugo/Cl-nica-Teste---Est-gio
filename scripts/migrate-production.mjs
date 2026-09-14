@@ -47,16 +47,12 @@ function apply(file) {
 }
 
 function hasTable(name) {
-  const output = query(
-    `SELECT name FROM sqlite_master WHERE type='table' AND name='${name}';`,
-  );
+  const output = query("SELECT name FROM sqlite_master WHERE type='table';");
   return new RegExp(`\\b${name}\\b`, "i").test(output);
 }
 
 function hasColumn(table, column) {
-  const output = query(
-    `SELECT name FROM pragma_table_info('${table}') WHERE name='${column}';`,
-  );
+  const output = query(`PRAGMA table_info('${table}');`);
   return new RegExp(`\\b${column}\\b`, "i").test(output);
 }
 

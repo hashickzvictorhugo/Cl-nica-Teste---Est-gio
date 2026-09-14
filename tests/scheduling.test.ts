@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildScheduleSlots, getEndTime, getWeekdayLabel, isSupportedDate,
-  isValidStartTime, isWeekend, parseIsoDate, sanitizePatientName, SLOT_STARTS,
+  isValidStartTime, isWeekend, parseIsoDate, sanitizePatientName,
+  sanitizePatientPhone, SLOT_STARTS,
 } from "../lib/scheduling.ts";
 
 test("accepts real dates from 2026 and rejects unsupported dates", () => {
@@ -41,4 +42,11 @@ test("only accepts configured start times", () => {
 test("normalizes patient names", () => {
   assert.equal(sanitizePatientName("  Maria   da Silva  "), "Maria da Silva");
   assert.equal(sanitizePatientName("M"), null);
+});
+
+test("normalizes optional patient phones", () => {
+  assert.equal(sanitizePatientPhone("(18) 99999-9999"), "18999999999");
+  assert.equal(sanitizePatientPhone("18 999999"), "18999999");
+  assert.equal(sanitizePatientPhone(""), "");
+  assert.equal(sanitizePatientPhone("123"), null);
 });

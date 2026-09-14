@@ -1,4 +1,4 @@
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { appointments } from "@/db/schema";
@@ -13,6 +13,7 @@ import {
   isValidStartTime,
   isWeekend,
   sanitizePatientName,
+  sanitizePatientPhone,
   SCHEDULING_YEAR,
   TIMEZONE,
 } from "@/lib/scheduling";
@@ -29,6 +30,7 @@ function presentAppointment(row: typeof appointments.$inferSelect) {
       : row.startTime,
     timezone: TIMEZONE,
     patientName: row.patientName,
+    patientPhone: row.patientPhone ?? "",
     createdAt: row.createdAt,
   };
 }
@@ -76,6 +78,7 @@ export async function POST(request: Request) {
   const date = payload.date;
   const startTime = payload.startTime;
   const patientName = sanitizePatientName(payload.patientName);
+  const patientPhone = sanitizePatientPhone(payload.patientPhone);
 
   if (!isSupportedDate(date)) {
     return jsonError(
@@ -98,6 +101,14 @@ export async function POST(request: Request) {
       400,
       "VALIDATION_ERROR",
       "Informe o nome do paciente com 2 a 80 caracteres.",
+    );
+  }
+
+  if (patientPhone === null) {
+    return jsonError(
+      400,
+      "INVALID_PHONE",
+      "Informe um telefone válido com 8 a 13 dígitos ou deixe o campo em branco.",
     );
   }
 
@@ -125,6 +136,7 @@ export async function POST(request: Request) {
       appointmentDate: date,
       startTime,
       patientName,
+      patientPhone: patientPhone || null,
       createdAt: new Date().toISOString(),
     };
 
@@ -162,6 +174,31 @@ export async function POST(request: Request) {
         "Não foi possível verificar os feriados agora. Tente novamente em instantes.",
       );
     }
+    return databaseError(error);
+  }
+}
+
+export async function DELETE(request: Request) {
+  const id = new URL(request.url).searchParams.get("id")?.trim();
+  if (!id) {
+    return jsonError(400, "VALIDATION_ERROR", "Informe o agendamento que deseja cancelar.");
+  }
+
+  try {
+    const removed = await getDb()
+      .delete(appointments)
+      .where(eq(appointments.id, id))
+      .returning({ id: appointments.id });
+
+    if (removed.length === 0) {
+      return jsonError(404, "APPOINTMENT_NOT_FOUND", "Agendamento não encontrado.");
+    }
+
+    return Response.json(
+      { message: "Agendamento cancelado.", id },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
     return databaseError(error);
   }
 }

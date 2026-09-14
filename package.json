@@ -1,6 +1,6 @@
 {
-  "name": "clinica-teste-agendamentos",
-  "version": "1.0.0",
+  "name": "garde-agenda",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "engines": { "node": ">=22.13.0" },
@@ -12,6 +12,7 @@
     "deploy": "pnpm run build && wrangler deploy",
     "db:remote:migrate": "wrangler d1 execute clinica-teste-agendamentos-db --remote --file drizzle/0000_quick_leopardon.sql --yes",
     "db:remote:add-phone": "wrangler d1 execute clinica-teste-agendamentos-db --remote --file drizzle/0001_add_patient_phone.sql --yes",
+    "db:remote:add-provider": "wrangler d1 execute clinica-teste-agendamentos-db --remote --file drizzle/0002_add_provider_schedule.sql --yes",
     "release": "pnpm run build && pnpm run db:remote:migrate && wrangler deploy",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc --noEmit --incremental false",

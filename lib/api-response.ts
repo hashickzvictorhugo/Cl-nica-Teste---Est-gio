@@ -3,6 +3,7 @@ export type ApiErrorCode =
   | "VALIDATION_ERROR"
   | "INVALID_SLOT"
   | "INVALID_PHONE"
+  | "INVALID_PROVIDER"
   | "WEEKEND"
   | "HOLIDAY"
   | "SLOT_TAKEN"

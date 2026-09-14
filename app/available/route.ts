@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { appointments } from "@/db/schema";
@@ -7,6 +7,7 @@ import {
   getHolidayForDate,
   HolidayServiceError,
 } from "@/lib/holiday-service";
+import { resolveProvider } from "@/lib/providers";
 import {
   buildScheduleSlots,
   BUSINESS_HOURS,
@@ -20,13 +21,23 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const date = new URL(request.url).searchParams.get("date");
+  const url = new URL(request.url);
+  const date = url.searchParams.get("date");
+  const provider = resolveProvider(url.searchParams.get("providerId"));
 
   if (!isSupportedDate(date)) {
     return jsonError(
       400,
       "INVALID_DATE",
       `Informe uma data válida de ${SCHEDULING_YEAR} no formato AAAA-MM-DD.`,
+    );
+  }
+
+  if (!provider) {
+    return jsonError(
+      400,
+      "INVALID_PROVIDER",
+      "Escolha um profissional válido para consultar a agenda.",
     );
   }
 
@@ -40,7 +51,12 @@ export async function GET(request: Request) {
       : await getDb()
           .select({ startTime: appointments.startTime })
           .from(appointments)
-          .where(eq(appointments.appointmentDate, date));
+          .where(
+            and(
+              eq(appointments.appointmentDate, date),
+              eq(appointments.providerId, provider.id),
+            ),
+          );
 
     const slots = buildScheduleSlots(
       occupiedRows.map((row) => row.startTime),
@@ -50,6 +66,7 @@ export async function GET(request: Request) {
     return Response.json(
       {
         date,
+        provider,
         timezone: TIMEZONE,
         weekday: getWeekdayLabel(date),
         isBusinessDay: !blockedReason,

@@ -14,6 +14,7 @@ import {
 import { getProviderById, resolveProvider } from "@/lib/providers";
 import {
   getEndTime,
+  hasSlotEnded,
   hasSlotStarted,
   isPastDate,
   isSupportedDate,
@@ -319,7 +320,8 @@ export async function PATCH(request: Request) {
       return jsonError(404, "APPOINTMENT_NOT_FOUND", "Agendamento não encontrado.");
     }
 
-    if (normalizedStatus(current[0].status) === "CANCELLED") {
+    const currentStatus = normalizedStatus(current[0].status);
+    if (currentStatus === "CANCELLED") {
       return jsonError(
         409,
         "INVALID_TRANSITION",
@@ -327,22 +329,52 @@ export async function PATCH(request: Request) {
       );
     }
 
+    if (currentStatus === "COMPLETED") {
+      if (status === "COMPLETED") {
+        return Response.json(
+          { message: "Consulta já estava concluída.", appointment: presentAppointment(current[0]) },
+          { headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      return jsonError(
+        409,
+        "INVALID_TRANSITION",
+        "Uma consulta concluída não pode voltar ao status confirmado.",
+      );
+    }
+
+    if (status === "CONFIRMED") {
+      return Response.json(
+        { message: "Consulta já está confirmada.", appointment: presentAppointment(current[0]) },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    if (
+      !isValidStartTime(current[0].startTime) ||
+      !hasSlotEnded(current[0].appointmentDate, current[0].startTime, new Date())
+    ) {
+      return jsonError(
+        409,
+        "APPOINTMENT_NOT_FINISHED",
+        "A consulta só pode ser concluída depois do término do horário reservado.",
+      );
+    }
+
     const now = new Date().toISOString();
     const updated = await getDb()
       .update(appointments)
       .set({
-        status,
+        status: "COMPLETED",
         updatedAt: now,
-        completedAt: status === "COMPLETED" ? now : null,
+        completedAt: now,
       })
       .where(eq(appointments.id, id))
       .returning();
 
     return Response.json(
       {
-        message: status === "COMPLETED"
-          ? "Consulta marcada como concluída."
-          : "Consulta marcada como confirmada.",
+        message: "Consulta marcada como concluída.",
         appointment: presentAppointment(updated[0]),
       },
       { headers: { "Cache-Control": "no-store" } },
@@ -369,10 +401,19 @@ export async function DELETE(request: Request) {
       return jsonError(404, "APPOINTMENT_NOT_FOUND", "Agendamento não encontrado.");
     }
 
-    if (normalizedStatus(current[0].status) === "CANCELLED") {
+    const currentStatus = normalizedStatus(current[0].status);
+    if (currentStatus === "CANCELLED") {
       return Response.json(
         { message: "Agendamento já estava cancelado.", appointment: presentAppointment(current[0]) },
         { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    if (currentStatus === "COMPLETED") {
+      return jsonError(
+        409,
+        "INVALID_TRANSITION",
+        "Uma consulta concluída permanece no histórico e não pode ser cancelada.",
       );
     }
 

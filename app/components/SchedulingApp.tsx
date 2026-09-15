@@ -5,17 +5,18 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 
-import {
-  getAppointmentStatusLabel,
-  type AppointmentStatus,
-} from "@/lib/appointment-status";
 import { DEFAULT_PROVIDER_ID, PROVIDERS, type Provider } from "@/lib/providers";
 
-type Slot = { startTime: string; endTime: string; available: boolean };
+type SlotUnavailableReason = "BLOCKED" | "OCCUPIED" | "TOO_SOON" | null;
+type Slot = {
+  startTime: string;
+  endTime: string;
+  available: boolean;
+  unavailableReason?: SlotUnavailableReason;
+};
 type Availability = {
   date: string;
   provider: Provider;
@@ -24,23 +25,18 @@ type Availability = {
   isBusinessDay: boolean;
   blockedReason: "WEEKEND" | "HOLIDAY" | null;
   holiday: { localName: string } | null;
+  bookingPolicy?: { minimumLeadMinutes: number };
   slots: Slot[];
   availableSlots: Slot[];
   availableCount: number;
 };
-type Appointment = {
+type CreatedAppointment = {
   id: string;
   date: string;
   startTime: string;
   endTime: string;
   provider: Provider;
-  patientName: string;
-  patientPhone: string;
-  status: AppointmentStatus;
-  createdAt: string;
-  updatedAt: string | null;
-  cancelledAt: string | null;
-  completedAt: string | null;
+  status: "CONFIRMED";
 };
 type NextAvailability = {
   fromDate: string;
@@ -59,10 +55,6 @@ type ApiErrorPayload = {
 type Toast = {
   type: "success" | "error" | "info";
   message: string;
-};
-type ConfirmAction = {
-  kind: "cancel" | "complete";
-  appointment: Appointment;
 };
 
 class ApiRequestError extends Error {
@@ -87,24 +79,7 @@ function today2026() {
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((part) => part.type === type)?.value ?? "";
   const value = `${get("year")}-${get("month")}-${get("day")}`;
-  return value.startsWith("2026-") ? value : "2026-02-10";
-}
-
-function formatPhone(value: string) {
-  const digits = value.replace(/\D/g, "");
-  if (digits.length === 13 && digits.startsWith("55")) {
-    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
-  }
-  if (digits.length === 12 && digits.startsWith("55")) {
-    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 8)}-${digits.slice(8)}`;
-  }
-  if (digits.length === 11) {
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-  }
-  if (digits.length === 10) {
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-  }
-  return digits;
+  return value.startsWith("2026-") ? value : "2026-12-31";
 }
 
 function formatDate(date: string) {
@@ -112,16 +87,11 @@ function formatDate(date: string) {
   return `${day}/${month}/${year}`;
 }
 
-function whatsappUrl(appointment: Appointment) {
-  const digits = appointment.patientPhone.replace(/\D/g, "");
-  if (!digits) return "";
-  const number = digits.startsWith("55") ? digits : `55${digits}`;
-  const message = [
-    `Olá, ${appointment.patientName}!`,
-    `Seu agendamento com ${appointment.provider.name} (${appointment.provider.specialty}) está confirmado para ${formatDate(appointment.date)} às ${appointment.startTime}.`,
-    "Se precisar falar com a clínica, responda por aqui.",
-  ].join("\n\n");
-  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+function slotLabel(slot: Slot) {
+  if (slot.available) return "Disponível";
+  if (slot.unavailableReason === "OCCUPIED") return "Ocupado";
+  if (slot.unavailableReason === "TOO_SOON") return "Horário encerrado";
+  return "Indisponível";
 }
 
 async function json<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
@@ -146,32 +116,23 @@ function errorMessage(error: unknown, fallback: string) {
 
 export function SchedulingApp() {
   const [providerId, setProviderId] = useState<string>(DEFAULT_PROVIDER_ID);
+  const [minimumDate, setMinimumDate] = useState(today2026);
   const [date, setDate] = useState(today2026);
   const [availabilityByProvider, setAvailabilityByProvider] = useState<Record<string, Availability>>({});
   const [slot, setSlot] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [website, setWebsite] = useState("");
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
-  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [findingNext, setFindingNext] = useState(false);
-  const [actionId, setActionId] = useState("");
   const [formError, setFormError] = useState("");
   const [toast, setToast] = useState<Toast | null>(null);
-  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [pendingSuggestion, setPendingSuggestion] = useState<{
     date: string;
     providerId: string;
     startTime: string;
   } | null>(null);
-
-  const [adminSearch, setAdminSearch] = useState("");
-  const [adminDate, setAdminDate] = useState("");
-  const [adminProvider, setAdminProvider] = useState("all");
-  const [adminStatus, setAdminStatus] = useState<AppointmentStatus | "all">("all");
-
-  const modalPrimaryRef = useRef<HTMLButtonElement>(null);
 
   const selectedProvider = useMemo(
     () => PROVIDERS.find((provider) => provider.id === providerId) ?? PROVIDERS[0],
@@ -193,26 +154,19 @@ export function SchedulingApp() {
   }, [toast]);
 
   useEffect(() => {
-    if (!confirmAction) return;
-    modalPrimaryRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setConfirmAction(null);
+    const syncCalendarDate = () => {
+      const current = today2026();
+      setMinimumDate(current);
+      setDate((selected) => {
+        if (selected >= current) return selected;
+        setSlot("");
+        return current;
+      });
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [confirmAction]);
-
-  const loadAppointments = useCallback(async () => {
-    setAppointmentsLoading(true);
-    try {
-      const data = await json<{ appointments: Appointment[] }>("/appointments");
-      setAppointments(data.appointments);
-    } catch (error) {
-      showToast("error", errorMessage(error, "Não foi possível carregar a agenda."));
-    } finally {
-      setAppointmentsLoading(false);
-    }
-  }, [showToast]);
+    syncCalendarDate();
+    const timer = window.setInterval(syncCalendarDate, 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const loadDateAvailability = useCallback(async (selectedDate: string) => {
     setAvailabilityLoading(true);
@@ -245,16 +199,6 @@ export function SchedulingApp() {
       active = false;
     };
   }, [date, loadDateAvailability]);
-
-  useEffect(() => {
-    let active = true;
-    queueMicrotask(() => {
-      if (active) void loadAppointments();
-    });
-    return () => {
-      active = false;
-    };
-  }, [loadAppointments]);
 
   useEffect(() => {
     if (!pendingSuggestion) return;
@@ -311,7 +255,7 @@ export function SchedulingApp() {
     setSaving(true);
     setFormError("");
     try {
-      const created = await json<{ appointment: Appointment }>("/appointments", {
+      const created = await json<{ appointment: CreatedAppointment }>("/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -320,16 +264,18 @@ export function SchedulingApp() {
           providerId,
           patientName: name,
           patientPhone: phone,
+          website,
         }),
       });
       setName("");
       setPhone("");
+      setWebsite("");
       setSlot("");
       showToast(
         "success",
         `Consulta confirmada com ${created.appointment.provider.name}. Protocolo ${created.appointment.id.slice(0, 8).toUpperCase()}.`,
       );
-      await Promise.all([loadDateAvailability(date), loadAppointments()]);
+      await loadDateAvailability(date);
     } catch (error) {
       const message = errorMessage(error, "Erro ao confirmar o agendamento.");
       setFormError(message);
@@ -340,75 +286,7 @@ export function SchedulingApp() {
     }
   }
 
-  async function executeConfirmedAction() {
-    if (!confirmAction) return;
-    const { kind, appointment } = confirmAction;
-    setActionId(appointment.id);
-    try {
-      if (kind === "cancel") {
-        await json<{ appointment: Appointment }>(
-          `/appointments?id=${encodeURIComponent(appointment.id)}`,
-          { method: "DELETE" },
-        );
-        showToast("success", "Consulta cancelada. O horário voltou a ficar disponível.");
-      } else {
-        await json<{ appointment: Appointment }>("/appointments", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: appointment.id, status: "COMPLETED" }),
-        });
-        showToast("success", "Consulta marcada como concluída.");
-      }
-      setConfirmAction(null);
-      await Promise.all([loadDateAvailability(date), loadAppointments()]);
-    } catch (error) {
-      showToast("error", errorMessage(error, "Não foi possível atualizar a consulta."));
-    } finally {
-      setActionId("");
-    }
-  }
-
-  const activeAppointments = useMemo(
-    () => appointments.filter((item) => item.status === "CONFIRMED"),
-    [appointments],
-  );
-  const completedAppointments = useMemo(
-    () => appointments.filter((item) => item.status === "COMPLETED"),
-    [appointments],
-  );
-  const cancelledAppointments = useMemo(
-    () => appointments.filter((item) => item.status === "CANCELLED"),
-    [appointments],
-  );
-  const selectedDateAppointments = useMemo(
-    () => activeAppointments.filter(
-      (item) => item.date === date && item.provider.id === providerId,
-    ).length,
-    [activeAppointments, date, providerId],
-  );
-  const selectedProviderAppointments = useMemo(
-    () => activeAppointments.filter((item) => item.provider.id === providerId).length,
-    [activeAppointments, providerId],
-  );
   const availableSlots = availability?.availableCount ?? 0;
-
-  const filteredAppointments = useMemo(() => {
-    const query = adminSearch.trim().toLocaleLowerCase("pt-BR");
-    return appointments.filter((item) => {
-      if (adminDate && item.date !== adminDate) return false;
-      if (adminProvider !== "all" && item.provider.id !== adminProvider) return false;
-      if (adminStatus !== "all" && item.status !== adminStatus) return false;
-      if (!query) return true;
-      const haystack = [
-        item.patientName,
-        item.patientPhone,
-        item.provider.name,
-        item.provider.specialty,
-      ].join(" ").toLocaleLowerCase("pt-BR");
-      return haystack.includes(query);
-    });
-  }, [adminDate, adminProvider, adminSearch, adminStatus, appointments]);
-
   const blocked = availability?.blockedReason;
   const dayStatus = !availability
     ? "Consultando"
@@ -417,9 +295,10 @@ export function SchedulingApp() {
       : blocked === "HOLIDAY"
         ? "Feriado"
         : "Dia útil";
+  const minimumLead = availability?.bookingPolicy?.minimumLeadMinutes ?? 30;
 
   return (
-    <main className="page-shell">
+    <main className="page-shell" aria-label="Agendamento público">
       <header className="topbar">
         <div className="brand-lockup">
           <div className="brand-mark">G+</div>
@@ -439,32 +318,8 @@ export function SchedulingApp() {
         </h1>
         <p className="hero-copy">
           Um fluxo digital para transformar pedidos de horário em agendamentos válidos,
-          com agenda por profissional, busca inteligente, histórico e operação em tempo real.
+          com agenda por profissional, busca inteligente e regras executadas no backend.
         </p>
-
-        <div className="hero-tags" aria-label="Destaques técnicos">
-          <span>API real de feriados</span>
-          <span>Agenda por profissional</span>
-          <span>Próximo horário automático</span>
-          <span>Cloudflare D1</span>
-        </div>
-
-        <div className="flow-panel" aria-label="Fluxo do agendamento">
-          <div className="flow-step">
-            <div className="flow-icon">WA</div>
-            <div><small>ENTRADA</small><strong>Paciente pede horário</strong><span>WhatsApp ou web</span></div>
-          </div>
-          <div className="flow-arrow">→</div>
-          <div className="flow-step">
-            <div className="flow-icon">API</div>
-            <div><small>VALIDAÇÃO</small><strong>Regras em tempo real</strong><span>Médico, data, feriado e conflito</span></div>
-          </div>
-          <div className="flow-arrow">→</div>
-          <div className="flow-step">
-            <div className="flow-icon">OK</div>
-            <div><small>RESULTADO</small><strong>Consulta confirmada</strong><span>Registro e histórico persistidos</span></div>
-          </div>
-        </div>
       </section>
 
       <section className="content-grid">
@@ -540,7 +395,7 @@ export function SchedulingApp() {
             aria-label="Data da consulta"
             className="date-input"
             type="date"
-            min="2026-01-01"
+            min={minimumDate}
             max="2026-12-31"
             value={date}
             onChange={(event) => {
@@ -586,6 +441,7 @@ export function SchedulingApp() {
             <div className="slots">
               {availability.slots.map((item) => (
                 <button
+                  aria-label={`${item.startTime} - ${slotLabel(item)}`}
                   aria-pressed={slot === item.startTime}
                   className={slot === item.startTime ? "slot selected" : "slot"}
                   disabled={!item.available}
@@ -594,7 +450,7 @@ export function SchedulingApp() {
                   type="button"
                 >
                   <strong>{item.startTime}</strong>
-                  <small>{item.available ? "Disponível" : "Ocupado"}</small>
+                  <small>{slotLabel(item)}</small>
                 </button>
               ))}
             </div>
@@ -631,6 +487,18 @@ export function SchedulingApp() {
             value={phone}
           />
 
+          <div aria-hidden="true" style={{ position: "absolute", left: "-10000px", width: 1, height: 1, overflow: "hidden" }}>
+            <label htmlFor="company-website">Website</label>
+            <input
+              autoComplete="off"
+              id="company-website"
+              onChange={(event) => setWebsite(event.target.value)}
+              tabIndex={-1}
+              type="text"
+              value={website}
+            />
+          </div>
+
           {formError ? <div className="error" role="alert">{formError}</div> : null}
 
           <button
@@ -642,158 +510,34 @@ export function SchedulingApp() {
           </button>
         </form>
 
-        <aside className="side-card" aria-label="Painel operacional da agenda">
-          <div className="side-eyebrow">OPERAÇÃO EM TEMPO REAL</div>
+        <aside className="side-card" aria-label="Resumo e regras do agendamento">
+          <div className="side-eyebrow">SEU AGENDAMENTO</div>
           <div className="side-title">
-            <div><h2>Painel da clínica</h2><p>Agenda, histórico e contato</p></div>
-            <strong>{activeAppointments.length}</strong>
+            <div><h2>Resumo da escolha</h2><p>Somente disponibilidade pública</p></div>
+            <strong>{availableSlots}</strong>
           </div>
 
           <div className="provider-summary">
             <small>PROFISSIONAL SELECIONADO</small>
             <strong>{selectedProvider.name}</strong>
-            <span>{selectedProvider.specialty} · {selectedDateAppointments} consulta(s) nesta data</span>
+            <span>{selectedProvider.specialty} · {formatDate(date)}</span>
           </div>
 
-          <div className="metrics metrics-four" aria-label="Resumo da agenda">
-            <div><strong>{activeAppointments.length}</strong><span>confirmadas</span></div>
-            <div><strong>{completedAppointments.length}</strong><span>concluídas</span></div>
-            <div><strong>{cancelledAppointments.length}</strong><span>canceladas</span></div>
-            <div><strong>{selectedProviderAppointments}</strong><span>do médico</span></div>
+          <div className="metrics metrics-four" aria-label="Políticas do agendamento">
+            <div><strong>{availableSlots}</strong><span>horários livres</span></div>
+            <div><strong>{minimumLead}m</strong><span>antecedência</span></div>
+            <div><strong>1h</strong><span>duração</span></div>
+            <div><strong>SP</strong><span>fuso horário</span></div>
           </div>
 
-          <div className="admin-panel">
-            <div className="admin-panel-title">
-              <div><strong>Agenda operacional</strong><span>Filtre e gerencie os registros</span></div>
-              <em>{filteredAppointments.length}</em>
-            </div>
-
-            <label className="filter-field filter-search" htmlFor="agenda-search">
-              <span>Buscar paciente ou telefone</span>
-              <input
-                id="agenda-search"
-                onChange={(event) => setAdminSearch(event.target.value)}
-                placeholder="Nome, telefone ou profissional"
-                type="search"
-                value={adminSearch}
-              />
-            </label>
-
-            <div className="filter-grid">
-              <label className="filter-field" htmlFor="agenda-provider">
-                <span>Profissional</span>
-                <select id="agenda-provider" onChange={(event) => setAdminProvider(event.target.value)} value={adminProvider}>
-                  <option value="all">Todos</option>
-                  {PROVIDERS.map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
-                </select>
-              </label>
-              <label className="filter-field" htmlFor="agenda-status">
-                <span>Status</span>
-                <select
-                  id="agenda-status"
-                  onChange={(event) => setAdminStatus(event.target.value as AppointmentStatus | "all")}
-                  value={adminStatus}
-                >
-                  <option value="all">Todos</option>
-                  <option value="CONFIRMED">Confirmados</option>
-                  <option value="COMPLETED">Concluídos</option>
-                  <option value="CANCELLED">Cancelados</option>
-                </select>
-              </label>
-              <label className="filter-field filter-date" htmlFor="agenda-date">
-                <span>Data</span>
-                <input
-                  id="agenda-date"
-                  max="2026-12-31"
-                  min="2026-01-01"
-                  onChange={(event) => setAdminDate(event.target.value)}
-                  type="date"
-                  value={adminDate}
-                />
-              </label>
-              <button
-                className="clear-filters"
-                onClick={() => {
-                  setAdminSearch("");
-                  setAdminDate("");
-                  setAdminProvider("all");
-                  setAdminStatus("all");
-                }}
-                type="button"
-              >
-                Limpar filtros
-              </button>
-            </div>
+          <div className="system-card">
+            <div><span className="status-dot" /><strong>Privacidade por padrão</strong></div>
+            <p>A área pública nunca lista nomes, telefones ou histórico de outros pacientes. A operação da clínica fica em uma área administrativa separada e autenticada.</p>
           </div>
-
-          {appointmentsLoading ? (
-            <div className="appointment-skeletons" aria-label="Carregando agenda">
-              {Array.from({ length: 3 }, (_, index) => <span className="skeleton appointment-skeleton" key={index} />)}
-            </div>
-          ) : filteredAppointments.length === 0 ? (
-            <div className="empty">
-              <strong>Nenhum registro encontrado</strong>
-              <span>Ajuste os filtros ou faça um novo agendamento.</span>
-            </div>
-          ) : (
-            <ol className="appointments operational-list">
-              {filteredAppointments.map((item) => {
-                const phoneLink = whatsappUrl(item);
-                return (
-                  <li className={`appointment-row status-${item.status.toLowerCase()}`} key={item.id}>
-                    <div className="appointment-date">{item.date.slice(8, 10)}<small>{item.date.slice(5, 7)}/26</small></div>
-                    <div className="appointment-info">
-                      <div className="appointment-topline">
-                        <strong>{item.startTime}–{item.endTime}</strong>
-                        <span className={`status-badge status-${item.status.toLowerCase()}`}>
-                          {getAppointmentStatusLabel(item.status)}
-                        </span>
-                      </div>
-                      <span className="patient-name">{item.patientName}</span>
-                      <small className="appointment-provider">{item.provider.name} · {item.provider.specialty}</small>
-                      {item.patientPhone ? <small className="appointment-phone">{formatPhone(item.patientPhone)}</small> : null}
-                      <div className="appointment-actions">
-                        {phoneLink && item.status === "CONFIRMED" ? (
-                          <a
-                            className="action-button whatsapp-button"
-                            href={phoneLink}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            Abrir WhatsApp
-                          </a>
-                        ) : null}
-                        {item.status === "CONFIRMED" ? (
-                          <>
-                            <button
-                              className="action-button complete-button"
-                              disabled={actionId === item.id}
-                              onClick={() => setConfirmAction({ kind: "complete", appointment: item })}
-                              type="button"
-                            >
-                              Concluir
-                            </button>
-                            <button
-                              className="action-button cancel-button"
-                              disabled={actionId === item.id}
-                              onClick={() => setConfirmAction({ kind: "cancel", appointment: item })}
-                              type="button"
-                            >
-                              Cancelar
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
 
           <div className="system-card">
             <div><span className="status-dot" /><strong>Regras automatizadas</strong></div>
-            <p>Feriados, fins de semana, agenda por profissional e conflitos são validados pelo backend.</p>
+            <p>Feriados, fins de semana, horários vencidos, antecedência mínima e conflitos são validados pelo backend antes de gravar no banco.</p>
           </div>
 
           <div className="hours">
@@ -815,44 +559,6 @@ export function SchedulingApp() {
           <span>{toast.type === "success" ? "✓" : toast.type === "error" ? "!" : "i"}</span>
           <p>{toast.message}</p>
           <button aria-label="Fechar aviso" onClick={() => setToast(null)} type="button">×</button>
-        </div>
-      ) : null}
-
-      {confirmAction ? (
-        <div className="modal-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setConfirmAction(null);
-        }}>
-          <div aria-labelledby="confirm-title" aria-modal="true" className="confirm-modal" role="dialog">
-            <div className={`modal-icon ${confirmAction.kind}`}>{confirmAction.kind === "cancel" ? "×" : "✓"}</div>
-            <h2 id="confirm-title">
-              {confirmAction.kind === "cancel" ? "Cancelar esta consulta?" : "Marcar como concluída?"}
-            </h2>
-            <p>
-              {confirmAction.appointment.patientName} · {confirmAction.appointment.provider.name}<br />
-              {formatDate(confirmAction.appointment.date)} às {confirmAction.appointment.startTime}
-            </p>
-            <span>
-              {confirmAction.kind === "cancel"
-                ? "O registro continuará no histórico, mas o horário será liberado para um novo agendamento."
-                : "A consulta permanecerá no histórico com status de concluída."}
-            </span>
-            <div className="modal-actions">
-              <button className="modal-secondary" onClick={() => setConfirmAction(null)} type="button">Voltar</button>
-              <button
-                className={confirmAction.kind === "cancel" ? "modal-primary danger" : "modal-primary"}
-                disabled={actionId === confirmAction.appointment.id}
-                onClick={() => void executeConfirmedAction()}
-                ref={modalPrimaryRef}
-                type="button"
-              >
-                {actionId === confirmAction.appointment.id
-                  ? "Atualizando…"
-                  : confirmAction.kind === "cancel"
-                    ? "Confirmar cancelamento"
-                    : "Confirmar conclusão"}
-              </button>
-            </div>
-          </div>
         </div>
       ) : null}
     </main>

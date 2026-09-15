@@ -10,7 +10,7 @@ Case técnico Full Stack desenvolvido a partir de um problema real: reduzir o at
 
 **https://clinica-teste-agendamentos.hashickzvictorhugo.workers.dev**
 
-A área administrativa fica separada em `/admin` e exige uma credencial configurada como secret no Cloudflare Worker.
+A área administrativa fica separada em `/admin`. O projeto suporta duas credenciais server-side: `ADMIN_TOKEN`, com acesso operacional completo, e `DEMO_ADMIN_TOKEN`, opcional, criado especificamente para avaliação em modo somente leitura. Nenhuma credencial é versionada no repositório.
 
 ## Principais diferenciais
 
@@ -30,6 +30,8 @@ A área administrativa fica separada em `/admin` e exige uma credencial configur
 - conclusão somente após o término real do horário;
 - remarcação no mesmo registro;
 - área administrativa separada e autenticada;
+- modo administrativo de demonstração somente leitura, sem acesso aos registros reais do D1;
+- dataset demo isolado e explicitamente fictício para avaliadores;
 - dados pessoais nunca são listados pela API pública;
 - token administrativo mantido somente em memória, com expiração por inatividade;
 - rate limiting por origem e por telefone no agendamento;
@@ -58,17 +60,26 @@ Paciente / navegador público
                 ├── regras de data/horário/feriado/conflito
                 └── Cloudflare D1
 
-Administrador
+Administrador completo
         │
         └── /admin
               │
               └── Authorization: Bearer <ADMIN_TOKEN>
-                    ├── GET /appointments?scope=admin
+                    ├── GET /appointments?scope=admin → D1
                     ├── PATCH /appointments
                     └── DELETE /appointments?id=...
+
+Avaliador / demonstração
+        │
+        └── /admin
+              │
+              └── Authorization: Bearer <DEMO_ADMIN_TOKEN>
+                    ├── GET /appointments?scope=admin → dataset fictício isolado
+                    ├── PATCH → 403 ADMIN_READ_ONLY
+                    └── DELETE → 403 ADMIN_READ_ONLY
 ```
 
-O frontend público não recebe a agenda operacional. Nome, telefone e histórico completo só são apresentados após autenticação administrativa validada pelo backend.
+O frontend público não recebe a agenda operacional. Nome, telefone e histórico completo do banco só são apresentados após autenticação administrativa completa. O modo demo recebe somente registros sintéticos incluídos no código para avaliação e não consulta PII operacional.
 
 ## Regras de negócio
 
@@ -153,27 +164,35 @@ Uma criação válida retorna `201`, mas a resposta pública é minimizada e **n
 
 ### `GET /appointments`
 
-A chamada pública retorna uma coleção vazia marcada como protegida. A listagem de pacientes só é liberada no escopo administrativo autenticado.
+A chamada pública retorna uma coleção vazia marcada como protegida. A listagem administrativa só é liberada após autenticação.
 
 ## Endpoints administrativos
 
-As rotas abaixo exigem:
+A leitura administrativa exige uma das credenciais válidas:
 
 ```text
 Authorization: Bearer <ADMIN_TOKEN>
 ```
 
+ou, para avaliação somente leitura:
+
+```text
+Authorization: Bearer <DEMO_ADMIN_TOKEN>
+```
+
 ### `GET /appointments?scope=admin`
 
-Retorna até 200 registros e aceita filtros opcionais por data, profissional, status e busca textual.
+Com `ADMIN_TOKEN`, retorna até 200 registros operacionais e aceita filtros opcionais por data, profissional, status e busca textual.
+
+Com `DEMO_ADMIN_TOKEN`, retorna somente registros fictícios isolados do D1. A resposta informa `access: "demo"` para que o painel sinalize o modo somente leitura.
 
 ### `PATCH /appointments`
 
-Conclui ou remarca um registro. Remarcações revalidam antecedência, calendário, profissional e conflitos.
+Conclui ou remarca um registro. Remarcações revalidam antecedência, calendário, profissional e conflitos. **Exige `ADMIN_TOKEN`; a credencial demo recebe `403 ADMIN_READ_ONLY`.**
 
 ### `DELETE /appointments?id=<id>`
 
-Executa cancelamento lógico e mantém o registro no histórico.
+Executa cancelamento lógico e mantém o registro no histórico. **Exige `ADMIN_TOKEN`; a credencial demo recebe `403 ADMIN_READ_ONLY`.**
 
 ## Profissionais demonstrativos
 
@@ -190,9 +209,11 @@ As decisões e limites estão detalhados em [`SECURITY.md`](./SECURITY.md).
 
 Resumo das proteções atuais:
 
-- secret administrativo fora do código-fonte;
+- secrets administrativos fora do código-fonte;
 - autenticação e autorização executadas no backend;
-- falha fechada se o secret não existir;
+- separação entre acesso `full` e `demo`;
+- modo demo sem leitura do D1 operacional e sem permissão de escrita;
+- falha fechada se nenhuma credencial administrativa existir;
 - comparação de token baseada em digest;
 - sessão administrativa apenas em memória e timeout por inatividade;
 - rate limiting por IP + telefone;
@@ -209,11 +230,19 @@ Resumo das proteções atuais:
 
 ### Configurando o admin
 
+Acesso operacional completo:
+
 ```powershell
 pnpm.cmd exec wrangler secret put ADMIN_TOKEN
 ```
 
-A credencial nunca deve ser enviada para o GitHub.
+Acesso de avaliação somente leitura:
+
+```powershell
+pnpm.cmd exec wrangler secret put DEMO_ADMIN_TOKEN
+```
+
+As credenciais devem ser diferentes e nunca devem ser enviadas para o GitHub. Para compartilhar o case com um avaliador, compartilhe somente o `DEMO_ADMIN_TOKEN`; preserve o `ADMIN_TOKEN` completo.
 
 ### Ativando o Cloudflare Turnstile
 
@@ -281,7 +310,7 @@ Antes de publicar, o script inspeciona o schema remoto e aplica apenas o que est
 4. status/histórico;
 5. triggers defensivas de integridade (`0004_harden_appointments.sql`).
 
-O fluxo é idempotente e evita reaplicar migrações de uso único já instaladas.
+O fluxo é idempotente e evita reaplicar migrações de uso único já instaladas. O modo demo não precisa de seed nem de migração: os registros de avaliação são sintéticos e ficam isolados do banco operacional.
 
 ## CI e supply chain
 

@@ -1,0 +1,2 @@
+#agendamento .side-card{display:none!important}
+#agendamento .content-grid{grid-template-columns:minmax(0,1fr)!important}

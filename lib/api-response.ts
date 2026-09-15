@@ -33,9 +33,10 @@ export function jsonError(status: number, code: ApiErrorCode, message: string) {
   );
 }
 
-export function databaseError(_error: unknown) {
-  // Não serializa nem registra o erro bruto: adapters de banco podem incluir
-  // parâmetros da consulta e, neste domínio, isso pode significar PII.
+export function databaseError(error: unknown) {
+  // Mantém o parâmetro consumido sem registrar o erro bruto: adapters de banco
+  // podem carregar parâmetros da consulta e, neste domínio, isso pode expor PII.
+  void error;
   console.error("Database request failed");
   return jsonError(
     503,

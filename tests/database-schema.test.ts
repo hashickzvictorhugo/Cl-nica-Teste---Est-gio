@@ -158,3 +158,27 @@ test("database enforces pre-attendance reason, type, duration and notes", () => 
   );
   db.close();
 });
+
+test("admin audit log is append-only", () => {
+  const db = database();
+  db.prepare(`INSERT INTO admin_audit_log
+    (id, appointment_id, action, actor, request_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)`)
+    .run("audit-1", "appointment-1", "CANCELLED", "admin@example.test", "request-1", "2026-01-01T12:00:00Z");
+
+  assert.throws(
+    () => db.prepare("UPDATE admin_audit_log SET actor = 'other' WHERE id = 'audit-1'").run(),
+    /admin audit log is immutable/,
+  );
+  assert.throws(
+    () => db.prepare("DELETE FROM admin_audit_log WHERE id = 'audit-1'").run(),
+    /admin audit log is immutable/,
+  );
+
+  const row = db.prepare("SELECT action, actor FROM admin_audit_log WHERE id = 'audit-1'").get() as {
+    action: string;
+    actor: string;
+  };
+  assert.deepEqual(row, { action: "CANCELLED", actor: "admin@example.test" });
+  db.close();
+});

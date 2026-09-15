@@ -2,6 +2,7 @@ declare namespace Cloudflare {
   interface Env {
     DB?: D1Database;
     ADMIN_TOKEN?: string;
+    DEMO_ADMIN_TOKEN?: string;
     TURNSTILE_SITE_KEY?: string;
     TURNSTILE_SECRET_KEY?: string;
     BOOKING_RATE_LIMITER?: {

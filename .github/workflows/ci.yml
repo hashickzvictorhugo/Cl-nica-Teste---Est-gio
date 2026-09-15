@@ -41,5 +41,5 @@ jobs:
       - name: Validate project
         run: pnpm run check
 
-      - name: Audit high-severity dependencies
+      - name: Audit runtime moderate+ and all dependencies high+
         run: pnpm run audit

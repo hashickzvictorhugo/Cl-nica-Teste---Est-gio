@@ -70,3 +70,29 @@ test("readJsonObject mede bytes reais mesmo com Content-Length enganoso", async 
     (error: unknown) => error instanceof JsonBodyError && error.status === 413,
   );
 });
+
+test("readJsonObject interrompe stream acima do limite sem depender de Content-Length", async () => {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode('{"payload":"'));
+      controller.enqueue(encoder.encode("x".repeat(80)));
+      controller.enqueue(encoder.encode('"}'));
+      controller.close();
+    },
+  });
+  const request = new Request("https://example.test", {
+    method: "POST",
+    headers: jsonHeaders,
+    body: stream,
+    duplex: "half",
+  } as RequestInit & { duplex: "half" });
+
+  await assert.rejects(
+    () => readJsonObject(request, 64),
+    (error: unknown) =>
+      error instanceof JsonBodyError &&
+      error.status === 413 &&
+      error.code === "PAYLOAD_TOO_LARGE",
+  );
+});

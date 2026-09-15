@@ -64,6 +64,11 @@ function hasTrigger(name) {
   return new RegExp(`\\b${name}\\b`, "i").test(output);
 }
 
+function hasIndex(name) {
+  const output = query("SELECT name FROM sqlite_master WHERE type='index';");
+  return new RegExp(`\\b${name}\\b`, "i").test(output);
+}
+
 function addColumnIfMissing(table, column, definition) {
   if (hasColumn(table, column)) return;
   console.log(`\nAdicionando coluna ${table}.${column}...`);
@@ -102,6 +107,19 @@ if (
   !hasTrigger("appointments_validate_pre_attendance_update")
 ) {
   apply("drizzle/0005_add_pre_attendance.sql");
+}
+
+if (!hasIndex("appointments_active_patient_date_start_time_unique")) {
+  apply("drizzle/0006_patient_slot_uniqueness.sql");
+}
+
+if (
+  !hasTable("admin_audit_log") ||
+  !hasTrigger("appointments_audit_update") ||
+  !hasTrigger("admin_audit_log_no_update") ||
+  !hasTrigger("admin_audit_log_no_delete")
+) {
+  apply("drizzle/0007_admin_audit_log.sql");
 }
 
 console.log("\nSchema remoto atualizado com segurança.");

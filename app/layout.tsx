@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./provider.css";
 import "./security-ui.css";
+import "./accessibility.css";
 
 const title = "Garde Agenda | Agendamento inteligente";
 const description = "Case técnico Full Stack com agenda multi-profissional, regras de negócio no backend, Cloudflare D1 e área administrativa protegida.";

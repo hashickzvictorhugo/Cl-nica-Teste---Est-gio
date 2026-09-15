@@ -29,6 +29,19 @@ Authorization: Bearer <ADMIN_TOKEN>
 
 O `ADMIN_TOKEN` é um secret do Cloudflare Worker e nunca deve ser colocado no GitHub, no JavaScript público ou em arquivos `.env` versionados.
 
+Para uma implantação clínica, o projeto também suporta uma segunda camada de identidade com Cloudflare Access. Quando `REQUIRE_CF_ACCESS_FOR_ADMIN=true`, o backend exige, além do `ADMIN_TOKEN`, um `Cf-Access-Jwt-Assertion` válido, verifica assinatura RS256 contra as chaves públicas do tenant, `iss`, `aud`, `exp`, `nbf` e opcionalmente uma allowlist de e-mails. Isso permite colocar SSO/MFA e identidade individual na frente do acesso administrativo sem confiar em um header de e-mail isolado.
+
+Variáveis do modo clínico:
+
+```text
+REQUIRE_CF_ACCESS_FOR_ADMIN=true
+CF_ACCESS_TEAM_DOMAIN=<equipe>.cloudflareaccess.com
+CF_ACCESS_AUD=<audience da aplicação Access>
+ADMIN_ALLOWED_EMAILS=profissional1@empresa.com,profissional2@empresa.com
+```
+
+A política do Cloudflare Access deve exigir MFA e restringir usuários/grupos autorizados. O modo demonstrativo não depende dessa camada para que avaliadores consigam usar a credencial demo somente leitura.
+
 ### Acesso de demonstração para avaliação
 
 Uma segunda credencial opcional, `DEMO_ADMIN_TOKEN`, permite que um avaliador abra o mesmo painel sem receber acesso aos registros operacionais do D1.
@@ -44,6 +57,8 @@ Quando a credencial demo é usada:
 A separação é imposta no servidor. Desabilitar os botões no frontend é apenas uma camada adicional de UX, não o controle de autorização principal.
 
 A credencial digitada no painel fica somente na memória do componente. Ela é descartada ao sair/recarregar a página, ao restaurar a página pelo histórico/bfcache e após 15 minutos de inatividade.
+
+Se `ADMIN_TOKEN` e `DEMO_ADMIN_TOKEN` forem iguais, o backend considera a configuração insegura e bloqueia todo acesso administrativo com erro de configuração. Não existe fallback para acesso completo.
 
 ## Configuração do acesso administrativo
 
@@ -73,11 +88,13 @@ pnpm.cmd run release
 - níveis separados de acesso `full` e `demo`;
 - credencial demo isolada dos dados reais do D1;
 - mutações administrativas aceitas apenas no nível `full`;
+- configuração com tokens full/demo iguais falha fechada;
 - falha fechada quando nenhuma credencial administrativa está configurada;
 - comparação das credenciais por digest SHA-256 e comparação byte a byte;
-- limitação de tentativas administrativas por origem;
+- rate limiting administrativo dedicado por origem;
 - sessão administrativa somente em memória, com expiração por inatividade;
-- `/admin` marcado como `noindex, nofollow`.
+- `/admin` marcado como `noindex, nofollow`, `noarchive` e `Cache-Control: no-store`;
+- suporte opcional a identidade individual, SSO/MFA e allowlist via Cloudflare Access JWT validado criptograficamente.
 
 ### Privacidade
 
@@ -93,13 +110,17 @@ pnpm.cmd run release
 
 ### Antiabuso
 
-- rate limiting no edge por endereço de origem;
-- segundo limite por telefone;
+- limite dedicado de criação por endereço de origem;
+- segundo limite por telefone normalizado;
+- limites próprios para consultas públicas de disponibilidade e para a área administrativa;
 - honeypot silencioso no formulário público;
-- integração opcional com Cloudflare Turnstile, validada novamente no backend;
-- limite real de 8 KiB para JSON, medido em bytes mesmo quando `Content-Length` está ausente ou incorreto.
+- Cloudflare Turnstile validado novamente no backend;
+- o Turnstile é fail-closed no endpoint de criação: sem configuração válida, o backend não aceita novos agendamentos;
+- a resposta do Turnstile é vinculada ao hostname da requisição e à action `book_appointment`;
+- limite real de 8 KiB para JSON aplicado durante a leitura incremental do stream, sem depender de `Content-Length`;
+- mutações com `Origin` incompatível ou `Sec-Fetch-Site: cross-site` são rejeitadas.
 
-O Turnstile só é ativado quando **as duas** variáveis abaixo estão configuradas no Worker:
+O Turnstile exige as duas variáveis abaixo no Worker:
 
 ```text
 TURNSTILE_SITE_KEY
@@ -108,7 +129,7 @@ TURNSTILE_SECRET_KEY
 
 A chave pública é entregue ao frontend por `/security-config`; a chave secreta nunca é retornada ao navegador.
 
-### Validação e integridade
+### Validação, concorrência e integridade
 
 - regras de negócio revalidadas no backend;
 - pré-atendimento validado novamente no backend, sem confiar no formulário do navegador;
@@ -117,11 +138,16 @@ A chave pública é entregue ao frontend por `/security-config`; a chave secreta
 - datas e horários interpretados em `America/Sao_Paulo`;
 - Drizzle ORM nas consultas ao D1;
 - índice único parcial impede dois agendamentos ativos do mesmo profissional/data/horário;
+- outro índice único parcial impede o mesmo telefone de manter duas consultas ativas no mesmo horário, mesmo com profissionais diferentes;
 - `CHECK` de horários e status no banco;
-- triggers defensivas validam nome, telefone, profissional, ano e os novos campos de pré-atendimento também no D1;
+- triggers defensivas validam nome, telefone, profissional, ano e os campos de pré-atendimento também no D1;
 - cancelamento lógico preserva histórico e libera o slot;
 - estados concluído/cancelado não são reativados;
-- horários passados e janela mínima de antecedência são rejeitados pelo servidor.
+- horários passados e janela mínima de antecedência são rejeitados pelo servidor;
+- remarcação, conclusão e cancelamento usam atualização condicional por estado para impedir lost updates em operações concorrentes;
+- conflitos detectados pela constraint do banco são convertidos em resposta de conflito, sem expor parâmetros internos;
+- alterações operacionais relevantes geram trilha de auditoria append-only, com proteção contra `UPDATE` e `DELETE` no próprio banco;
+- a trilha mínima é gerada por trigger do D1, inclusive para alterações fora da rota normal; quando Cloudflare Access está habilitado, a identidade individual permanece disponível nos logs do Access e deve ser integrada à observabilidade/SIEM operacional.
 
 ### Navegador e transporte
 
@@ -131,6 +157,7 @@ O projeto envia, entre outros:
 - `Strict-Transport-Security` (HSTS);
 - `X-Content-Type-Options: nosniff`;
 - `X-Frame-Options: DENY`;
+- `X-Permitted-Cross-Domain-Policies: none`;
 - `Referrer-Policy: no-referrer`;
 - `Cross-Origin-Opener-Policy`;
 - `Cross-Origin-Resource-Policy`;
@@ -139,17 +166,31 @@ O projeto envia, entre outros:
 
 A CSP bloqueia objetos, frames externos não autorizados, handlers inline de script e restringe conexões/frames adicionais ao domínio necessário para o Turnstile. O projeto não usa `dangerouslySetInnerHTML` nem `eval`.
 
+A diretiva `unsafe-inline` ainda é necessária em `script-src` para o bootstrap/hidratação do stack Next/Vinext atual. Isso é tratado como risco residual documentado; remover a diretiva sem suporte confiável a nonce/hash pode quebrar a aplicação e não é feito apenas para melhorar uma pontuação de auditoria.
+
 ## Dependências e supply chain
 
 - dependências críticas são fixadas em versões explícitas;
-- o CI executa lint, TypeScript, testes, build e auditoria de vulnerabilidades de severidade alta;
-- `pnpm-lock.yaml` deve ser versionado e o CI deve usar instalação congelada;
-- atualizações automáticas de dependências são acompanhadas pelo Dependabot.
+- o CI executa lint, TypeScript, testes e build antes da auditoria de dependências;
+- vulnerabilidades de severidade **moderada ou superior** bloqueiam o CI quando estão na árvore de dependências de produção;
+- vulnerabilidades de severidade **alta ou crítica** bloqueiam o CI em toda a árvore, inclusive ferramentas de desenvolvimento;
+- `pnpm-lock.yaml` é versionado e o CI usa instalação congelada;
+- GitHub Actions usadas pelo pipeline são fixadas por SHA;
+- CodeQL roda em push, pull request e agenda semanal com queries `security-extended`;
+- atualizações automáticas de npm e GitHub Actions são acompanhadas pelo Dependabot.
 
-## Limites deliberados do case
+Existe um advisory moderado conhecido (`GHSA-67mh-4wv8-2f99`) em uma versão antiga de `esbuild` trazida transitivamente por `drizzle-kit` via `@esbuild-kit/esm-loader`. O pacote afetado é uma ferramenta de desenvolvimento usada para geração de migrações e não integra o bundle implantado no Worker. O risco descrito pelo advisory depende do servidor de desenvolvimento do `esbuild`; esse caminho não é exposto pelo Garde Agenda. A exceção permanece documentada e deve ser removida assim que a cadeia upstream abandonar a dependência vulnerável. Essa justificativa não reduz o gate de dependências de produção nem o gate de severidade alta da árvore completa.
 
-A etapa de pré-atendimento é uma simulação de organização do atendimento. Ela não substitui anamnese, avaliação profissional, serviço de emergência ou sistema clínico adequado e não deve ser usada para tomar decisões médicas.
+## Controles operacionais recomendados para uso clínico real
 
-Para uma clínica real, a autenticação por tokens compartilhados deveria ser substituída por identidade individual por funcionário, MFA, RBAC, rotação/revogação de sessão, trilha de auditoria imutável, criptografia e governança compatíveis com dados de saúde, política formal de retenção/eliminação de PII, observabilidade de segurança e gestão operacional de incidentes.
+O código oferece as fundações técnicas, mas uma operação de saúde precisa também de controles fora do repositório. Antes de aceitar dados reais de pacientes:
 
-Esses limites são documentados para não confundir um case demonstrativo com um sistema clínico pronto para processamento de dados de saúde em produção.
+1. habilitar Cloudflare Access para `/admin` com MFA obrigatório e grupos/allowlist por funcionário;
+2. ativar proteção da branch `main`/ruleset exigindo CI e CodeQL antes de merge;
+3. definir política formal de retenção e eliminação de PII, base legal LGPD e procedimento de atendimento aos direitos do titular;
+4. integrar logs do Cloudflare Access/Workers a observabilidade/SIEM com alertas e retenção adequada;
+5. documentar resposta a incidentes, rotação/revogação de credenciais e processo de offboarding;
+6. manter backups, testes de restauração e revisão periódica das permissões;
+7. realizar pentest externo antes de classificar o sistema como pronto para dados clínicos reais.
+
+Esses itens não devem ser simulados em código quando dependem de governança, identidade corporativa ou operação humana. A documentação os mantém explícitos para não confundir um case tecnicamente endurecido com uma certificação de segurança ou conformidade.

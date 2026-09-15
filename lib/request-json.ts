@@ -12,6 +12,32 @@ export class JsonBodyError extends Error {
   }
 }
 
+async function readTextWithLimit(request: Request, maxBytes: number) {
+  if (!request.body) return "";
+
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let raw = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel("payload too large").catch(() => undefined);
+        throw new JsonBodyError(413, "PAYLOAD_TOO_LARGE", "A solicitação excede o tamanho permitido.");
+      }
+      raw += decoder.decode(value, { stream: true });
+    }
+    raw += decoder.decode();
+    return raw;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export async function readJsonObject(
   request: Request,
   maxBytes = 8_192,
@@ -30,11 +56,7 @@ export async function readJsonObject(
     throw new JsonBodyError(413, "PAYLOAD_TOO_LARGE", "A solicitação excede o tamanho permitido.");
   }
 
-  const raw = await request.text();
-  const actualBytes = new TextEncoder().encode(raw).byteLength;
-  if (actualBytes > maxBytes) {
-    throw new JsonBodyError(413, "PAYLOAD_TOO_LARGE", "A solicitação excede o tamanho permitido.");
-  }
+  const raw = await readTextWithLimit(request, maxBytes);
 
   let parsed: unknown;
   try {

@@ -20,7 +20,9 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --max-warnings 0",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "audit": "pnpm audit --audit-level=moderate",
+    "audit:runtime": "pnpm audit --prod --audit-level=moderate",
+    "audit:all": "pnpm audit --audit-level=high",
+    "audit": "pnpm run audit:runtime && pnpm run audit:all",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
     "db:generate": "drizzle-kit generate",
     "db:local:migrate": "wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/bootstrap.sql"

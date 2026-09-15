@@ -19,13 +19,14 @@ type AccessPayload = {
   sub?: string;
 };
 
+type AccessJwk = JsonWebKey & { kid?: string };
 type AccessCerts = {
-  keys?: JsonWebKey[];
+  keys?: AccessJwk[];
 };
 
 type CertCache = {
   expiresAt: number;
-  keys: JsonWebKey[];
+  keys: AccessJwk[];
 };
 
 let certCache: CertCache | null = null;

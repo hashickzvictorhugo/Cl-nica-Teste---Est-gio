@@ -80,7 +80,13 @@ export function AdminDashboard() {
 
   useEffect(() => {
     const saved = sessionStorage.getItem("garde-admin-token");
-    if (saved) void unlock(saved);
+    if (!saved) return;
+    const timer = window.setTimeout(() => {
+      void unlock(saved);
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // A restauração só deve ocorrer uma vez ao abrir a área administrativa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function refresh() {

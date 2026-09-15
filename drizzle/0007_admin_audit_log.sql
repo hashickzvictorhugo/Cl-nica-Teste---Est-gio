@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS `admin_audit_log` (
   `appointment_id` text NOT NULL,
   `action` text NOT NULL,
   `actor` text NOT NULL,
-  `source` text NOT NULL,
+  `source` text NOT NULL DEFAULT 'APPLICATION',
   `request_id` text NOT NULL,
   `created_at` text NOT NULL,
   CONSTRAINT "admin_audit_action_check" CHECK(`action` IN ('RESCHEDULED', 'COMPLETED', 'CANCELLED')),

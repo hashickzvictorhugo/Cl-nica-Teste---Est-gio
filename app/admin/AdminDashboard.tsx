@@ -59,6 +59,20 @@ export function AdminDashboard() {
   const [provider, setProvider] = useState("all");
   const [status, setStatus] = useState<AppointmentStatus | "all">("all");
 
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setToken("");
+      setAppointments([]);
+      setTokenInput("");
+      setError("");
+      setLoading(false);
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
   async function unlock(candidate: string) {
     setLoading(true);
     setError("");
@@ -67,27 +81,14 @@ export function AdminDashboard() {
       setAppointments(rows);
       setToken(candidate);
       setTokenInput("");
-      sessionStorage.setItem("garde-admin-token", candidate);
     } catch (err) {
       setAppointments([]);
       setToken("");
-      sessionStorage.removeItem("garde-admin-token");
       setError(err instanceof Error ? err.message : "Falha na autenticação.");
     } finally {
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    const saved = sessionStorage.getItem("garde-admin-token");
-    if (!saved) return;
-    const timer = window.setTimeout(() => {
-      void unlock(saved);
-    }, 0);
-    return () => window.clearTimeout(timer);
-    // A restauração só deve ocorrer uma vez ao abrir a área administrativa.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function refresh() {
     if (!token) return;
@@ -179,7 +180,7 @@ export function AdminDashboard() {
           </button>
           {error ? <div className={styles.message}>{error}</div> : null}
         </form>
-        <div className={styles.notice}>A credencial fica somente nesta aba do navegador, em sessionStorage, e nunca é gravada no código-fonte.</div>
+        <div className={styles.notice}>A credencial é mantida somente na memória desta página. Ao sair do painel, recarregar ou voltar pelo histórico do navegador, será necessário autenticar novamente.</div>
       </div>
     );
   }
@@ -192,9 +193,10 @@ export function AdminDashboard() {
           <p>Dados pessoais e ações administrativas protegidos por autenticação no backend.</p>
         </div>
         <button className={styles.ghost} onClick={() => {
-          sessionStorage.removeItem("garde-admin-token");
           setToken("");
           setAppointments([]);
+          setTokenInput("");
+          setError("");
         }} type="button">Sair</button>
       </div>
 

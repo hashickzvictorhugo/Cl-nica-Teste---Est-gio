@@ -59,6 +59,11 @@ function hasColumn(table, column) {
   return new RegExp(`\\b${column}\\b`, "i").test(output);
 }
 
+function hasTrigger(name) {
+  const output = query("SELECT name FROM sqlite_master WHERE type='trigger';");
+  return new RegExp(`\\b${name}\\b`, "i").test(output);
+}
+
 console.log("Verificando schema remoto antes do deploy...");
 
 if (!hasTable("appointments")) {
@@ -75,6 +80,10 @@ if (!hasColumn("appointments", "provider_id")) {
 
 if (!hasColumn("appointments", "status")) {
   apply("drizzle/0003_add_appointment_status.sql");
+}
+
+if (!hasTrigger("appointments_validate_insert") || !hasTrigger("appointments_validate_update")) {
+  apply("drizzle/0004_harden_appointments.sql");
 }
 
 console.log("\nSchema remoto atualizado com segurança.");

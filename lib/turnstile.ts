@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
 
+import { TURNSTILE_ACTION } from "@/lib/security-constants";
+
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-export const TURNSTILE_ACTION = "book_appointment";
 
 type TurnstileResponse = {
   success?: boolean;

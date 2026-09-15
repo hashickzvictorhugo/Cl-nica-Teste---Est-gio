@@ -9,11 +9,12 @@ import {
 } from "@/lib/holiday-service";
 import { resolveProvider } from "@/lib/providers";
 import {
+  BOOKING_MIN_LEAD_MINUTES,
   buildScheduleSlots,
   BUSINESS_HOURS,
   getWeekdayLabel,
-  hasSlotStarted,
   isPastDate,
+  isSlotBookable,
   isSupportedDate,
   isWeekend,
   SCHEDULING_YEAR,
@@ -73,10 +74,17 @@ export async function GET(request: Request) {
     const slots = buildScheduleSlots(
       occupiedRows.map((row) => row.startTime),
       Boolean(blockedReason),
-    ).map((slot) => ({
-      ...slot,
-      available: slot.available && !hasSlotStarted(date, slot.startTime, now),
-    }));
+    ).map((slot) => {
+      if (!slot.available) return slot;
+      if (!isSlotBookable(date, slot.startTime, now)) {
+        return {
+          ...slot,
+          available: false,
+          unavailableReason: "TOO_SOON" as const,
+        };
+      }
+      return slot;
+    });
     const availableSlots = slots.filter((slot) => slot.available);
 
     return Response.json(
@@ -89,6 +97,9 @@ export async function GET(request: Request) {
         blockedReason,
         holiday,
         businessHours: BUSINESS_HOURS,
+        bookingPolicy: {
+          minimumLeadMinutes: BOOKING_MIN_LEAD_MINUTES,
+        },
         slots,
         availableSlots,
         availableCount: availableSlots.length,

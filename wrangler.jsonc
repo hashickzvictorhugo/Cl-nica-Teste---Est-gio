@@ -10,5 +10,15 @@
       "database_name": "clinica-teste-agendamentos-db",
       "database_id": "d48639e8-bc39-4138-87eb-4b68230300d0"
     }
+  ],
+  "ratelimits": [
+    {
+      "name": "BOOKING_RATE_LIMITER",
+      "namespace_id": "583214",
+      "simple": {
+        "limit": 8,
+        "period": 60
+      }
+    }
   ]
 }

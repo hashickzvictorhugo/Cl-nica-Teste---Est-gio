@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  buildScheduleSlots, getEndTime, getSchedulingClock, getWeekdayLabel,
-  hasSlotEnded, hasSlotStarted, isPastDate, isSupportedDate,
-  isValidStartTime, isWeekend, parseIsoDate, sanitizePatientName,
-  sanitizePatientPhone, SLOT_STARTS,
+  BOOKING_MIN_LEAD_MINUTES, buildScheduleSlots, getEndTime, getSchedulingClock,
+  getWeekdayLabel, hasSlotEnded, hasSlotStarted, isPastDate, isSlotBookable,
+  isSupportedDate, isValidStartTime, isWeekend, minutesUntilSlot,
+  parseIsoDate, sanitizePatientName, sanitizePatientPhone, SLOT_STARTS,
 } from "../lib/scheduling.ts";
 
 test("accepts real dates from 2026 and rejects unsupported dates", () => {
@@ -38,6 +38,21 @@ test("rejects past dates and slots that already started today", () => {
   assert.equal(hasSlotStarted("2026-09-15", "08:00", now), false);
 });
 
+test("requires minimum lead time for new bookings", () => {
+  const now = new Date("2026-09-14T17:31:00.000Z"); // 14:31 em São Paulo
+  assert.equal(BOOKING_MIN_LEAD_MINUTES, 30);
+  assert.equal(minutesUntilSlot("2026-09-14", "15:00", now), 29);
+  assert.equal(isSlotBookable("2026-09-14", "15:00", now), false);
+  assert.equal(isSlotBookable("2026-09-14", "16:00", now), true);
+  assert.equal(isSlotBookable("2026-09-15", "08:00", now), true);
+});
+
+test("accepts a slot exactly at the minimum lead time", () => {
+  const now = new Date("2026-09-14T17:30:00.000Z"); // 14:30 em São Paulo
+  assert.equal(minutesUntilSlot("2026-09-14", "15:00", now), 30);
+  assert.equal(isSlotBookable("2026-09-14", "15:00", now), true);
+});
+
 test("only considers a consultation finished after its one-hour slot ends", () => {
   const during = new Date("2026-09-14T17:20:00.000Z");
   const after = new Date("2026-09-14T18:00:00.000Z");
@@ -57,6 +72,7 @@ test("creates the ten one-hour slots", () => {
 test("marks occupied times unavailable", () => {
   const slots = buildScheduleSlots(["09:00", "14:00"]);
   assert.equal(slots.find((item) => item.startTime === "09:00")?.available, false);
+  assert.equal(slots.find((item) => item.startTime === "09:00")?.unavailableReason, "OCCUPIED");
   assert.equal(slots.find((item) => item.startTime === "15:00")?.available, true);
 });
 

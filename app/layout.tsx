@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./provider.css";
+import "./security-ui.css";
 
 export const metadata: Metadata = {
   title: "Garde Agenda | Agendamento inteligente",

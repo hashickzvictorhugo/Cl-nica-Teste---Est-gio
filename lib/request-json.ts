@@ -1,8 +1,10 @@
+import type { ApiErrorCode } from "@/lib/api-response";
+
 export class JsonBodyError extends Error {
   status: number;
-  code: string;
+  code: ApiErrorCode;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: ApiErrorCode, message: string) {
     super(message);
     this.name = "JsonBodyError";
     this.status = status;

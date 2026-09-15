@@ -64,6 +64,12 @@ function hasTrigger(name) {
   return new RegExp(`\\b${name}\\b`, "i").test(output);
 }
 
+function addColumnIfMissing(table, column, definition) {
+  if (hasColumn(table, column)) return;
+  console.log(`\nAdicionando coluna ${table}.${column}...`);
+  query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
+}
+
 console.log("Verificando schema remoto antes do deploy...");
 
 if (!hasTable("appointments")) {
@@ -84,6 +90,18 @@ if (!hasColumn("appointments", "status")) {
 
 if (!hasTrigger("appointments_validate_insert") || !hasTrigger("appointments_validate_update")) {
   apply("drizzle/0004_harden_appointments.sql");
+}
+
+addColumnIfMissing("appointments", "visit_reason", "text");
+addColumnIfMissing("appointments", "symptom_duration", "text");
+addColumnIfMissing("appointments", "visit_type", "text");
+addColumnIfMissing("appointments", "patient_notes", "text");
+
+if (
+  !hasTrigger("appointments_validate_pre_attendance_insert") ||
+  !hasTrigger("appointments_validate_pre_attendance_update")
+) {
+  apply("drizzle/0005_add_pre_attendance.sql");
 }
 
 console.log("\nSchema remoto atualizado com segurança.");

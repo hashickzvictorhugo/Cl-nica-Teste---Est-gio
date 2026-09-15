@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/hashickzvictorhugo/Cl-nica-Teste---Est-gio/actions/workflows/ci.yml/badge.svg)](https://github.com/hashickzvictorhugo/Cl-nica-Teste---Est-gio/actions/workflows/ci.yml)
 
-Case técnico Full Stack desenvolvido a partir de um problema real: reduzir o atendimento manual de uma clínica que recebe pedidos de horários pelo WhatsApp. A solução consulta disponibilidade, executa regras de negócio no backend, organiza agendas independentes por profissional, encontra o próximo horário livre, preserva histórico e persiste os dados em Cloudflare D1.
+Case técnico Full Stack desenvolvido a partir de um problema real: reduzir o atendimento manual de uma clínica que recebe pedidos de horários pelo WhatsApp. A solução reúne uma prévia curta do atendimento, consulta disponibilidade, executa regras de negócio no backend, organiza agendas independentes por profissional, encontra o próximo horário livre, preserva histórico e persiste os dados em Cloudflare D1.
 
 > **Observação:** “Garde Agenda” é um conceito demonstrativo inspirado no contexto do desafio. Não é um produto oficial da Garde Inteligência Empresarial. O ambiente demonstrativo deve usar apenas dados fictícios.
 
@@ -10,11 +10,46 @@ Case técnico Full Stack desenvolvido a partir de um problema real: reduzir o at
 
 **https://clinica-teste-agendamentos.hashickzvictorhugo.workers.dev**
 
-A área administrativa fica separada em `/admin`. O projeto suporta duas credenciais server-side: `ADMIN_TOKEN`, com acesso operacional completo, e `DEMO_ADMIN_TOKEN`, opcional, criado especificamente para avaliação em modo somente leitura. Nenhuma credencial é versionada no repositório.
+Área administrativa: `/admin`.
+
+O projeto suporta duas credenciais server-side:
+
+- `ADMIN_TOKEN`: acesso operacional completo;
+- `DEMO_ADMIN_TOKEN`: acesso de avaliação somente leitura, com dataset fictício isolado do D1 real.
+
+Nenhuma credencial é versionada no repositório.
+
+## Fluxo do produto
+
+```text
+Pré-atendimento
+      ↓
+Profissional
+      ↓
+Data
+      ↓
+Horário
+      ↓
+Confirmação
+```
+
+Antes de escolher a agenda, o usuário informa somente o necessário para organizar a solicitação:
+
+- nome completo;
+- telefone / WhatsApp;
+- motivo da consulta;
+- duração opcional do que está sentindo;
+- primeira consulta ou retorno;
+- observações adicionais opcionais.
+
+A etapa é **organizacional**. O sistema não interpreta sintomas para diagnosticar, classificar risco ou recomendar tratamento. A interface informa que a prévia não substitui avaliação médica e orienta a procurar um serviço de urgência em situações graves ou emergenciais.
+
+O case evita coletar CPF, RG, endereço, medicamentos ou histórico clínico detalhado.
 
 ## Principais diferenciais
 
 - landing page responsiva com experiência de produto completa;
+- pré-atendimento antes da escolha de agenda;
 - quatro profissionais fictícios com agendas independentes;
 - consulta de disponibilidade por data e profissional;
 - busca automática de **próximo horário disponível**;
@@ -30,9 +65,10 @@ A área administrativa fica separada em `/admin`. O projeto suporta duas credenc
 - conclusão somente após o término real do horário;
 - remarcação no mesmo registro;
 - área administrativa separada e autenticada;
+- pré-atendimento visível apenas em contexto administrativo autorizado;
 - modo administrativo de demonstração somente leitura, sem acesso aos registros reais do D1;
 - dataset demo isolado e explicitamente fictício para avaliadores;
-- dados pessoais nunca são listados pela API pública;
+- dados pessoais e pré-atendimento nunca são listados pela API pública;
 - token administrativo mantido somente em memória, com expiração por inatividade;
 - rate limiting por origem e por telefone no agendamento;
 - rate limiting para tentativas administrativas inválidas;
@@ -43,18 +79,19 @@ A área administrativa fica separada em `/admin`. O projeto suporta duas credenc
 - D1 com índice único, `CHECK`s e triggers defensivas;
 - dependências travadas por `pnpm-lock.yaml`;
 - CI com lint, TypeScript, testes, build e auditoria de vulnerabilidades altas;
-- Dependabot para dependências npm e GitHub Actions.
+- CodeQL e Dependabot.
 
 ## Arquitetura de acesso
 
 ```text
 Paciente / navegador público
         │
+        ├── pré-atendimento local no fluxo
         ├── GET /available
         ├── GET /next-available
         └── POST /appointments
                 │
-                ├── valida payload
+                ├── valida payload + pré-atendimento
                 ├── rate limit IP + telefone
                 ├── Turnstile (quando configurado)
                 ├── regras de data/horário/feriado/conflito
@@ -79,9 +116,11 @@ Avaliador / demonstração
                     └── DELETE → 403 ADMIN_READ_ONLY
 ```
 
-O frontend público não recebe a agenda operacional. Nome, telefone e histórico completo do banco só são apresentados após autenticação administrativa completa. O modo demo recebe somente registros sintéticos incluídos no código para avaliação e não consulta PII operacional.
+O frontend público não recebe a agenda operacional. Nome, telefone, motivo, observações e histórico completo só são apresentados após autenticação administrativa. O modo demo recebe somente registros sintéticos incluídos no código e não consulta PII operacional.
 
 ## Regras de negócio
+
+### Agenda
 
 - atendimento de segunda a sexta-feira;
 - funcionamento das **08:00 às 18:00**;
@@ -90,20 +129,26 @@ O frontend público não recebe a agenda operacional. Nome, telefone e históric
 - datas devem pertencer a 2026;
 - datas passadas não aceitam novos agendamentos;
 - no dia atual, slots dentro da antecedência mínima de 30 minutos ficam indisponíveis;
-- o frontend diferencia horário ocupado, horário encerrado e bloqueio de calendário;
 - a busca de próximo horário ignora fins de semana, feriados, conflitos e slots vencidos;
 - cada profissional tem agenda independente;
 - profissionais diferentes podem usar o mesmo horário;
 - um profissional não pode ter dois agendamentos ativos no mesmo slot;
-- quando há telefone, o mesmo paciente não pode manter duas consultas ativas no mesmo horário;
+- o mesmo telefone não pode manter duas consultas ativas no mesmo horário;
 - cancelamentos preservam histórico e liberam o slot;
 - cancelamentos são permitidos até 60 minutos antes;
 - uma consulta só pode ser concluída depois do fim do horário reservado;
 - `COMPLETED` e `CANCELLED` são estados terminais;
-- remarcação só ocorre a partir de `CONFIRMED` e revalida todas as regras;
+- remarcação só ocorre a partir de `CONFIRMED` e revalida as regras.
+
+### Pré-atendimento
+
 - nome: 2–80 caracteres após normalização;
-- telefone opcional: 8–13 dígitos após normalização;
-- fuso: `America/Sao_Paulo`.
+- telefone obrigatório: 8–13 dígitos após normalização;
+- motivo da consulta: 5–300 caracteres;
+- duração opcional: `TODAY`, `FEW_DAYS`, `WEEKS`, `MONTHS` ou `NOT_APPLICABLE`;
+- tipo obrigatório: `FIRST_VISIT` ou `RETURN`;
+- observações opcionais: até 500 caracteres;
+- nenhuma classificação clínica é gerada a partir desses textos.
 
 ## Concorrência e integridade do banco
 
@@ -116,14 +161,7 @@ WHERE status <> 'CANCELLED'
 
 Assim, duas requisições concorrentes para o mesmo profissional/slot não criam duplicidade: apenas uma persiste e a outra recebe `409 SLOT_TAKEN`.
 
-O banco também mantém `CHECK`s de horário/status e triggers defensivas para validar:
-
-- nome do paciente;
-- formato do telefone;
-- IDs de profissionais permitidos;
-- ano da data do agendamento.
-
-Isso reduz a dependência exclusiva da camada de aplicação para preservar integridade.
+O banco mantém `CHECK`s e triggers defensivas para validar horário/status, nome, telefone, profissional, ano e os limites/enums do pré-atendimento.
 
 ## API externa de feriados
 
@@ -154,13 +192,17 @@ Exemplo:
   "providerId": "ana-martins",
   "patientName": "Maria Silva",
   "patientPhone": "18999999999",
+  "visitReason": "Dor de cabeça há alguns dias",
+  "symptomDuration": "FEW_DAYS",
+  "visitType": "FIRST_VISIT",
+  "patientNotes": "Exemplo fictício para demonstração.",
   "turnstileToken": "..."
 }
 ```
 
 `turnstileToken` só é obrigatório quando as chaves do Turnstile estiverem configuradas no Worker.
 
-Uma criação válida retorna `201`, mas a resposta pública é minimizada e **não repete nome ou telefone**. Ela contém apenas protocolo/ID, data, horário, profissional, fuso e status.
+Uma criação válida retorna `201`, mas a resposta pública é minimizada e **não repete nome, telefone, motivo, duração, tipo ou observações**. Ela contém apenas protocolo/ID, data, horário, profissional, fuso e status.
 
 ### `GET /appointments`
 
@@ -182,9 +224,9 @@ Authorization: Bearer <DEMO_ADMIN_TOKEN>
 
 ### `GET /appointments?scope=admin`
 
-Com `ADMIN_TOKEN`, retorna até 200 registros operacionais e aceita filtros opcionais por data, profissional, status e busca textual.
+Com `ADMIN_TOKEN`, retorna até 200 registros operacionais, incluindo o pré-atendimento, e aceita filtros por data, profissional, status e busca textual.
 
-Com `DEMO_ADMIN_TOKEN`, retorna somente registros fictícios isolados do D1. A resposta informa `access: "demo"` para que o painel sinalize o modo somente leitura.
+Com `DEMO_ADMIN_TOKEN`, retorna somente registros fictícios isolados do D1. A resposta informa `access: "demo"` e o painel sinaliza o modo somente leitura.
 
 ### `PATCH /appointments`
 
@@ -203,57 +245,27 @@ Executa cancelamento lógico e mantém o registro no histórico. **Exige `ADMIN_
 | `camila-rocha` | Dra. Camila Rocha | Dermatologia |
 | `beatriz-lima` | Dra. Beatriz Lima | Pediatria |
 
-## Segurança
+## Segurança e privacidade
 
 As decisões e limites estão detalhados em [`SECURITY.md`](./SECURITY.md).
 
-Resumo das proteções atuais:
+Resumo:
 
 - secrets administrativos fora do código-fonte;
-- autenticação e autorização executadas no backend;
+- autenticação e autorização server-side;
 - separação entre acesso `full` e `demo`;
-- modo demo sem leitura do D1 operacional e sem permissão de escrita;
-- falha fechada se nenhuma credencial administrativa existir;
+- demo sem leitura do D1 operacional e sem escrita;
 - comparação de token baseada em digest;
 - sessão administrativa apenas em memória e timeout por inatividade;
-- rate limiting por IP + telefone;
-- rate limiting de tentativas administrativas;
-- honeypot público;
-- Turnstile opcional com verificação server-side;
+- rate limiting por origem + telefone;
+- honeypot e Turnstile;
 - limite real de corpo JSON;
 - queries via Drizzle ORM;
-- minimização de PII nas respostas públicas;
+- minimização de PII e conteúdo de pré-atendimento nas respostas públicas;
 - `Cache-Control: no-store` em respostas sensíveis;
 - CSP, HSTS, frame protection, Permissions Policy, COOP/CORP e Referrer Policy restritiva;
 - banco com controles adicionais de integridade;
-- lockfile versionado e auditoria de dependências no CI.
-
-### Configurando o admin
-
-Acesso operacional completo:
-
-```powershell
-pnpm.cmd exec wrangler secret put ADMIN_TOKEN
-```
-
-Acesso de avaliação somente leitura:
-
-```powershell
-pnpm.cmd exec wrangler secret put DEMO_ADMIN_TOKEN
-```
-
-As credenciais devem ser diferentes e nunca devem ser enviadas para o GitHub. Para compartilhar o case com um avaliador, compartilhe somente o `DEMO_ADMIN_TOKEN`; preserve o `ADMIN_TOKEN` completo.
-
-### Ativando o Cloudflare Turnstile
-
-Crie um widget Turnstile para o domínio/hostname da aplicação e configure **as duas** variáveis no Worker:
-
-```text
-TURNSTILE_SITE_KEY
-TURNSTILE_SECRET_KEY
-```
-
-`TURNSTILE_SITE_KEY` é pública e pode ser configurada como variável do Worker. `TURNSTILE_SECRET_KEY` deve ser configurada como secret. A funcionalidade só é ativada quando ambas estiverem presentes; sem elas, o restante do sistema continua funcionando normalmente.
+- lockfile, auditoria, CodeQL e Dependabot.
 
 ## Stack
 
@@ -263,7 +275,7 @@ TURNSTILE_SECRET_KEY
 - **API externa:** Nager.Date
 - **Anti-bot:** Cloudflare Turnstile opcional
 - **Testes:** Node.js Test Runner + SQLite em memória
-- **Qualidade:** ESLint + TypeScript + GitHub Actions + pnpm audit
+- **Qualidade:** ESLint + TypeScript + GitHub Actions + CodeQL + pnpm audit
 - **Deploy:** Cloudflare Workers
 
 ## Executando localmente
@@ -290,7 +302,7 @@ pnpm run audit
 
 ## Deploy e migração segura
 
-O fluxo recomendado para produção é:
+Fluxo recomendado para produção:
 
 ```bash
 pnpm run release
@@ -302,15 +314,16 @@ No Windows/PowerShell:
 pnpm.cmd run release
 ```
 
-Antes de publicar, o script inspeciona o schema remoto e aplica apenas o que estiver ausente:
+Antes de publicar, o script inspeciona o schema remoto e aplica somente o que estiver ausente:
 
 1. tabela base `appointments`;
 2. `patient_phone`;
 3. `provider_id` e agenda multi-profissional;
 4. status/histórico;
-5. triggers defensivas de integridade (`0004_harden_appointments.sql`).
+5. triggers defensivas gerais (`0004_harden_appointments.sql`);
+6. colunas e triggers do pré-atendimento (`0005_add_pre_attendance.sql`).
 
-O fluxo é idempotente e evita reaplicar migrações de uso único já instaladas. O modo demo não precisa de seed nem de migração: os registros de avaliação são sintéticos e ficam isolados do banco operacional.
+As quatro novas colunas são verificadas individualmente antes de qualquer `ALTER TABLE`, mantendo o upgrade idempotente. O modo demo não precisa de seed nem migration porque os registros de avaliação são sintéticos e ficam isolados do banco operacional.
 
 ## CI e supply chain
 
@@ -325,8 +338,10 @@ O workflow de CI:
 7. executa build;
 8. falha em vulnerabilidades de dependências de severidade alta ou crítica.
 
-O Dependabot verifica semanalmente dependências npm e GitHub Actions.
+CodeQL analisa o código e o Dependabot verifica semanalmente dependências npm e GitHub Actions.
 
 ## Escopo do case
 
-Este projeto demonstra engenharia de produto, regras de agenda, segurança defensiva e operação básica. Uma clínica real ainda deveria usar identidade individual por funcionário, MFA, RBAC, auditoria imutável, políticas de retenção/eliminação de PII, gestão de incidentes e controles organizacionais adequados ao tratamento de dados de saúde.
+Este projeto demonstra engenharia de produto, regras de agenda, segurança defensiva e operação básica. A prévia de atendimento é somente uma simulação de organização e não deve ser usada como prontuário ou ferramenta de decisão médica.
+
+Uma clínica real ainda deveria usar identidade individual por funcionário, MFA, RBAC, auditoria imutável, controles específicos para dados de saúde, políticas de retenção/eliminação de PII, observabilidade, backup/restore e gestão de incidentes.

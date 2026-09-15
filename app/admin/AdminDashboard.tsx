@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import type { AdminAccessLevel } from "@/lib/admin-access";
 import { getAppointmentStatusLabel, type AppointmentStatus } from "@/lib/appointment-status";
+import { symptomDurationLabel, visitTypeLabel } from "@/lib/pre-attendance";
 import { PROVIDERS, type Provider } from "@/lib/providers";
 
 import styles from "./admin.module.css";
@@ -18,6 +19,10 @@ type Appointment = {
   provider: Provider;
   patientName: string;
   patientPhone: string;
+  visitReason: string;
+  symptomDuration: string;
+  visitType: string;
+  patientNotes: string;
   status: AppointmentStatus;
 };
 
@@ -210,7 +215,14 @@ export function AdminDashboard() {
       if (provider !== "all" && item.provider.id !== provider) return false;
       if (status !== "all" && item.status !== status) return false;
       if (!query) return true;
-      return [item.patientName, item.patientPhone, item.provider.name, item.provider.specialty]
+      return [
+        item.patientName,
+        item.patientPhone,
+        item.provider.name,
+        item.provider.specialty,
+        item.visitReason,
+        item.patientNotes,
+      ]
         .join(" ")
         .toLocaleLowerCase("pt-BR")
         .includes(query);
@@ -256,7 +268,7 @@ export function AdminDashboard() {
       <div className={styles.toolbar}>
         <div>
           <h2>Operação da clínica</h2>
-          <p>Dados pessoais e ações administrativas protegidos por autenticação no backend.</p>
+          <p>Dados pessoais, pré-atendimento e ações administrativas protegidos por autenticação no backend.</p>
         </div>
         <div className={styles.actions}>
           <button className={styles.ghost} disabled={loading} onClick={() => void refresh()} type="button">Atualizar</button>
@@ -266,7 +278,7 @@ export function AdminDashboard() {
 
       {readOnly ? (
         <div className={styles.notice} role="status">
-          <strong>Modo demonstração — somente leitura.</strong> Os registros exibidos são fictícios e isolados do banco operacional. Concluir, cancelar e contatar pacientes ficam bloqueados pelo frontend e pela API.
+          <strong>Modo demonstração — somente leitura.</strong> Os registros e dados de pré-atendimento exibidos são fictícios e isolados do banco operacional. Concluir, cancelar e contatar pacientes ficam bloqueados pelo frontend e pela API.
         </div>
       ) : null}
 
@@ -278,7 +290,7 @@ export function AdminDashboard() {
       </div>
 
       <div className={styles.filters}>
-        <label>Buscar<input onChange={(event) => setSearch(event.target.value)} placeholder="Paciente, telefone ou profissional" type="search" value={search} /></label>
+        <label>Buscar<input onChange={(event) => setSearch(event.target.value)} placeholder="Paciente, telefone, motivo ou profissional" type="search" value={search} /></label>
         <label>Data<input max="2026-12-31" min="2026-01-01" onChange={(event) => setDate(event.target.value)} type="date" value={date} /></label>
         <label>Profissional<select onChange={(event) => setProvider(event.target.value)} value={provider}><option value="all">Todos</option>{PROVIDERS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label>Status<select onChange={(event) => setStatus(event.target.value as AppointmentStatus | "all")} value={status}><option value="all">Todos</option><option value="CONFIRMED">Confirmados</option><option value="COMPLETED">Concluídos</option><option value="CANCELLED">Cancelados</option></select></label>
@@ -301,6 +313,17 @@ export function AdminDashboard() {
                   <span>{item.provider.name} · {item.provider.specialty}</span>
                   {item.patientPhone ? <span>{formatPhone(item.patientPhone)}</span> : null}
                   <span className={`${styles.badge} ${item.status === "CONFIRMED" ? styles.confirmed : item.status === "COMPLETED" ? styles.completed : styles.cancelled}`}>{getAppointmentStatusLabel(item.status)}</span>
+                  <details className={styles.preAttendance}>
+                    <summary>Pré-atendimento</summary>
+                    <div className={styles.preAttendanceBody}>
+                      <div className={styles.preAttendanceMeta}>
+                        <span><strong>Tipo</strong>{visitTypeLabel(item.visitType)}</span>
+                        <span><strong>Duração</strong>{symptomDurationLabel(item.symptomDuration)}</span>
+                      </div>
+                      <p><strong>Motivo</strong>{item.visitReason || "Registro anterior à implantação do pré-atendimento."}</p>
+                      {item.patientNotes ? <p><strong>Observações</strong>{item.patientNotes}</p> : null}
+                    </div>
+                  </details>
                 </div>
                 <div className={styles.actions}>
                   {phoneLink && item.status === "CONFIRMED" && !readOnly ? <a href={phoneLink} rel="noreferrer" target="_blank">WhatsApp</a> : null}

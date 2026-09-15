@@ -18,6 +18,12 @@ import {
   getHolidayForDate,
   HolidayServiceError,
 } from "@/lib/holiday-service";
+import {
+  sanitizePatientNotes,
+  sanitizeSymptomDuration,
+  sanitizeVisitReason,
+  sanitizeVisitType,
+} from "@/lib/pre-attendance";
 import { getProviderById, resolveProvider } from "@/lib/providers";
 import { JsonBodyError, readJsonObject } from "@/lib/request-json";
 import {
@@ -64,6 +70,10 @@ function presentAdminAppointment(row: typeof appointments.$inferSelect) {
     provider: providerFor(row),
     patientName: row.patientName,
     patientPhone: row.patientPhone ?? "",
+    visitReason: row.visitReason ?? "",
+    symptomDuration: row.symptomDuration ?? "",
+    visitType: row.visitType ?? "",
+    patientNotes: row.patientNotes ?? "",
     status: normalizedStatus(row.status),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? null,
@@ -191,7 +201,12 @@ export async function GET(request: Request) {
   if (status && status !== "all" && isAppointmentStatus(status)) conditions.push(eq(appointments.status, status));
   if (search) {
     const pattern = `%${search}%`;
-    conditions.push(or(like(appointments.patientName, pattern), like(appointments.patientPhone, pattern))!);
+    conditions.push(or(
+      like(appointments.patientName, pattern),
+      like(appointments.patientPhone, pattern),
+      like(appointments.visitReason, pattern),
+      like(appointments.patientNotes, pattern),
+    )!);
   }
 
   try {
@@ -239,6 +254,10 @@ export async function POST(request: Request) {
   const provider = resolveProvider(payload.providerId);
   const patientName = sanitizePatientName(payload.patientName);
   const patientPhone = sanitizePatientPhone(payload.patientPhone);
+  const visitReason = sanitizeVisitReason(payload.visitReason);
+  const symptomDuration = sanitizeSymptomDuration(payload.symptomDuration);
+  const visitType = sanitizeVisitType(payload.visitType);
+  const patientNotes = sanitizePatientNotes(payload.patientNotes);
 
   if (!isSupportedDate(date)) {
     return jsonError(400, "INVALID_DATE", `Informe uma data válida de ${SCHEDULING_YEAR} no formato AAAA-MM-DD.`);
@@ -262,11 +281,23 @@ export async function POST(request: Request) {
   if (!patientName) {
     return jsonError(400, "VALIDATION_ERROR", "Informe o nome do paciente com 2 a 80 caracteres.");
   }
-  if (patientPhone === null) {
-    return jsonError(400, "INVALID_PHONE", "Informe um telefone válido com 8 a 13 dígitos ou deixe o campo em branco.");
+  if (patientPhone === null || !patientPhone) {
+    return jsonError(400, "INVALID_PHONE", "Informe um telefone / WhatsApp válido com 8 a 13 dígitos.");
+  }
+  if (!visitReason) {
+    return jsonError(400, "INVALID_VISIT_REASON", "Descreva brevemente o motivo da consulta com 5 a 300 caracteres.");
+  }
+  if (symptomDuration === null) {
+    return jsonError(400, "INVALID_SYMPTOM_DURATION", "Escolha uma duração de sintomas válida ou deixe o campo em branco.");
+  }
+  if (!visitType) {
+    return jsonError(400, "INVALID_VISIT_TYPE", "Informe se é a primeira consulta ou um retorno.");
+  }
+  if (patientNotes === null) {
+    return jsonError(400, "INVALID_PATIENT_NOTES", "As observações adicionais devem ter no máximo 500 caracteres.");
   }
 
-  const rateLimitError = await enforceBookingRateLimit(request, patientPhone || "");
+  const rateLimitError = await enforceBookingRateLimit(request, patientPhone);
   if (rateLimitError) return rateLimitError;
 
   const turnstileError = await verifyTurnstile(request, payload.turnstileToken);
@@ -277,7 +308,7 @@ export async function POST(request: Request) {
     if (isWeekend(date)) return jsonError(422, "WEEKEND", "A clínica não abre aos fins de semana. Escolha um dia útil.");
     if (holiday) return jsonError(422, "HOLIDAY", `Não há atendimento em ${holiday.localName}. Escolha outra data.`);
 
-    if (patientPhone && await patientHasConflict({ patientPhone, date, startTime })) {
+    if (await patientHasConflict({ patientPhone, date, startTime })) {
       return jsonError(409, "PATIENT_CONFLICT", "Este telefone já possui outra consulta ativa nesse mesmo horário.");
     }
 
@@ -290,7 +321,11 @@ export async function POST(request: Request) {
         startTime,
         providerId: provider.id,
         patientName,
-        patientPhone: patientPhone || null,
+        patientPhone,
+        visitReason,
+        symptomDuration: symptomDuration || null,
+        visitType,
+        patientNotes: patientNotes || null,
         status: "CONFIRMED",
         createdAt: now,
         updatedAt: now,

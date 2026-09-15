@@ -5,6 +5,8 @@ export const BUSINESS_HOURS = {
   closesAt: "18:00",
   durationMinutes: 60,
 } as const;
+export const BOOKING_MIN_LEAD_MINUTES = 30;
+export const CANCELLATION_MIN_LEAD_MINUTES = 60;
 
 export const SLOT_STARTS = [
   "08:00", "09:00", "10:00", "11:00", "12:00",
@@ -12,7 +14,13 @@ export const SLOT_STARTS = [
 ] as const;
 
 export type SlotStart = (typeof SLOT_STARTS)[number];
-export type ScheduleSlot = { startTime: SlotStart; endTime: string; available: boolean };
+export type SlotUnavailableReason = "BLOCKED" | "OCCUPIED" | "TOO_SOON" | null;
+export type ScheduleSlot = {
+  startTime: SlotStart;
+  endTime: string;
+  available: boolean;
+  unavailableReason?: SlotUnavailableReason;
+};
 
 const WEEKDAYS_PT_BR = [
   "domingo", "segunda-feira", "terça-feira", "quarta-feira",
@@ -81,6 +89,30 @@ export function getSchedulingClock(now: Date = new Date()) {
   };
 }
 
+function minutesFromClock(value: string) {
+  const [hour, minute] = value.split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+export function minutesUntilSlot(
+  date: string,
+  startTime: string,
+  now: Date = new Date(),
+) {
+  const current = getSchedulingClock(now);
+  const currentDate = parseIsoDate(current.date);
+  const targetDate = parseIsoDate(date);
+  if (!currentDate || !targetDate) return Number.NEGATIVE_INFINITY;
+
+  const dayDifference = Math.round(
+    (Date.UTC(targetDate.year, targetDate.month - 1, targetDate.day) -
+      Date.UTC(currentDate.year, currentDate.month - 1, currentDate.day)) /
+      86_400_000,
+  );
+
+  return dayDifference * 1440 + minutesFromClock(startTime) - minutesFromClock(current.time);
+}
+
 export function isPastDate(date: string, now: Date = new Date()) {
   return date < getSchedulingClock(now).date;
 }
@@ -90,10 +122,25 @@ export function hasSlotStarted(
   startTime: string,
   now: Date = new Date(),
 ) {
-  const current = getSchedulingClock(now);
-  if (date < current.date) return true;
-  if (date > current.date) return false;
-  return startTime <= current.time;
+  return minutesUntilSlot(date, startTime, now) <= 0;
+}
+
+export function isSlotBookable(
+  date: string,
+  startTime: string,
+  now: Date = new Date(),
+  minimumLeadMinutes = BOOKING_MIN_LEAD_MINUTES,
+) {
+  return minutesUntilSlot(date, startTime, now) >= minimumLeadMinutes;
+}
+
+export function isWithinCancellationWindow(
+  date: string,
+  startTime: string,
+  now: Date = new Date(),
+  minimumLeadMinutes = CANCELLATION_MIN_LEAD_MINUTES,
+) {
+  return minutesUntilSlot(date, startTime, now) < minimumLeadMinutes;
 }
 
 export function hasSlotEnded(
@@ -112,11 +159,15 @@ export function buildScheduleSlots(
   blocked = false,
 ): ScheduleSlot[] {
   const occupied = new Set(occupiedStartTimes);
-  return SLOT_STARTS.map((startTime) => ({
-    startTime,
-    endTime: getEndTime(startTime),
-    available: !blocked && !occupied.has(startTime),
-  }));
+  return SLOT_STARTS.map((startTime) => {
+    const isOccupied = occupied.has(startTime);
+    return {
+      startTime,
+      endTime: getEndTime(startTime),
+      available: !blocked && !isOccupied,
+      unavailableReason: blocked ? "BLOCKED" : isOccupied ? "OCCUPIED" : null,
+    };
+  });
 }
 
 export function sanitizePatientName(value: unknown) {

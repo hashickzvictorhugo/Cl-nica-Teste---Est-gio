@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import type { AdminAccessLevel } from "@/lib/admin-access";
 import { getAppointmentStatusLabel, type AppointmentStatus } from "@/lib/appointment-status";
 import { PROVIDERS, type Provider } from "@/lib/providers";
 
@@ -22,6 +23,8 @@ type Appointment = {
 
 type ApiPayload = {
   appointments?: Appointment[];
+  access?: AdminAccessLevel;
+  demo?: boolean;
   error?: { message?: string };
 };
 
@@ -61,12 +64,16 @@ async function requestAppointments(token: string) {
       response.status,
     );
   }
-  return data.appointments ?? [];
+  return {
+    appointments: data.appointments ?? [],
+    access: data.access ?? "full",
+  };
 }
 
 export function AdminDashboard() {
   const [tokenInput, setTokenInput] = useState("");
   const [token, setToken] = useState("");
+  const [access, setAccess] = useState<AdminAccessLevel | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -75,8 +82,11 @@ export function AdminDashboard() {
   const [provider, setProvider] = useState("all");
   const [status, setStatus] = useState<AppointmentStatus | "all">("all");
 
+  const readOnly = access === "demo";
+
   const lock = useCallback((message = "") => {
     setToken("");
+    setAccess(null);
     setAppointments([]);
     setTokenInput("");
     setLoading(false);
@@ -117,8 +127,9 @@ export function AdminDashboard() {
     setLoading(true);
     setError("");
     try {
-      const rows = await requestAppointments(candidate);
-      setAppointments(rows);
+      const result = await requestAppointments(candidate);
+      setAppointments(result.appointments);
+      setAccess(result.access);
       setToken(candidate);
       setTokenInput("");
     } catch (err) {
@@ -133,7 +144,9 @@ export function AdminDashboard() {
     setLoading(true);
     setError("");
     try {
-      setAppointments(await requestAppointments(token));
+      const result = await requestAppointments(token);
+      setAppointments(result.appointments);
+      setAccess(result.access);
     } catch (err) {
       if (err instanceof AdminRequestError && (err.status === 401 || err.status === 429)) {
         lock(err.message);
@@ -147,6 +160,11 @@ export function AdminDashboard() {
 
   async function updateAppointment(item: Appointment, kind: "complete" | "cancel") {
     if (!token) return;
+    if (readOnly) {
+      setError("O modo demonstração é somente leitura. Nenhum registro pode ser alterado com esta credencial.");
+      return;
+    }
+
     const confirmed = window.confirm(
       kind === "cancel"
         ? `Cancelar a consulta de ${item.patientName}?`
@@ -207,18 +225,18 @@ export function AdminDashboard() {
     return (
       <div className={`${styles.card} ${styles.login}`}>
         <h2>Área protegida</h2>
-        <p>Os dados de pacientes e as ações operacionais exigem a credencial administrativa configurada no servidor.</p>
+        <p>Os dados de pacientes e as ações operacionais exigem uma credencial válida. Avaliadores podem usar uma credencial de demonstração somente leitura.</p>
         <form onSubmit={(event: FormEvent) => {
           event.preventDefault();
           if (tokenInput.trim()) void unlock(tokenInput.trim());
         }}>
           <label htmlFor="admin-token">
-            Credencial administrativa
+            Credencial administrativa ou de demonstração
             <input
               id="admin-token"
               autoComplete="current-password"
               onChange={(event) => setTokenInput(event.target.value)}
-              placeholder="ADMIN_TOKEN"
+              placeholder="Credencial de acesso"
               type="password"
               value={tokenInput}
             />
@@ -245,6 +263,12 @@ export function AdminDashboard() {
           <button className={styles.ghost} onClick={() => lock()} type="button">Sair</button>
         </div>
       </div>
+
+      {readOnly ? (
+        <div className={styles.notice} role="status">
+          <strong>Modo demonstração — somente leitura.</strong> Os registros exibidos são fictícios e isolados do banco operacional. Concluir, cancelar e contatar pacientes ficam bloqueados pelo frontend e pela API.
+        </div>
+      ) : null}
 
       <div className={styles.metrics} aria-label="Resumo da agenda">
         <div className={styles.metric}><strong>{confirmed}</strong><span>confirmadas</span></div>
@@ -279,9 +303,9 @@ export function AdminDashboard() {
                   <span className={`${styles.badge} ${item.status === "CONFIRMED" ? styles.confirmed : item.status === "COMPLETED" ? styles.completed : styles.cancelled}`}>{getAppointmentStatusLabel(item.status)}</span>
                 </div>
                 <div className={styles.actions}>
-                  {phoneLink && item.status === "CONFIRMED" ? <a href={phoneLink} rel="noreferrer" target="_blank">WhatsApp</a> : null}
-                  {item.status === "CONFIRMED" ? <button className={styles.success} onClick={() => void updateAppointment(item, "complete")} type="button">Concluir</button> : null}
-                  {item.status === "CONFIRMED" ? <button className={styles.danger} onClick={() => void updateAppointment(item, "cancel")} type="button">Cancelar</button> : null}
+                  {phoneLink && item.status === "CONFIRMED" && !readOnly ? <a href={phoneLink} rel="noreferrer" target="_blank">WhatsApp</a> : null}
+                  {item.status === "CONFIRMED" ? <button className={styles.success} disabled={readOnly} onClick={() => void updateAppointment(item, "complete")} title={readOnly ? "Indisponível no modo demonstração" : undefined} type="button">Concluir</button> : null}
+                  {item.status === "CONFIRMED" ? <button className={styles.danger} disabled={readOnly} onClick={() => void updateAppointment(item, "cancel")} title={readOnly ? "Indisponível no modo demonstração" : undefined} type="button">Cancelar</button> : null}
                 </div>
               </li>
             );

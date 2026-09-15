@@ -16,6 +16,15 @@ export async function readJsonObject(
   request: Request,
   maxBytes = 8_192,
 ): Promise<Record<string, unknown>> {
+  const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new JsonBodyError(
+      415,
+      "UNSUPPORTED_MEDIA_TYPE",
+      "Envie a solicitação com Content-Type application/json.",
+    );
+  }
+
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
     throw new JsonBodyError(413, "PAYLOAD_TOO_LARGE", "A solicitação excede o tamanho permitido.");

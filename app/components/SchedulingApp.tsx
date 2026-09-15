@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 
+import { TurnstileWidget } from "@/app/components/TurnstileWidget";
 import { DEFAULT_PROVIDER_ID, PROVIDERS, type Provider } from "@/lib/providers";
 
 type SlotUnavailableReason = "BLOCKED" | "OCCUPIED" | "TOO_SOON" | null;
@@ -123,6 +124,8 @@ export function SchedulingApp() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [website, setWebsite] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [findingNext, setFindingNext] = useState(false);
@@ -265,6 +268,7 @@ export function SchedulingApp() {
           patientName: name,
           patientPhone: phone,
           website,
+          turnstileToken,
         }),
       });
       setName("");
@@ -282,6 +286,8 @@ export function SchedulingApp() {
       showToast("error", message);
       await loadDateAvailability(date);
     } finally {
+      setTurnstileToken("");
+      setTurnstileResetKey((value) => value + 1);
       setSaving(false);
     }
   }
@@ -498,6 +504,8 @@ export function SchedulingApp() {
               value={website}
             />
           </div>
+
+          <TurnstileWidget onToken={setTurnstileToken} resetKey={turnstileResetKey} />
 
           {formError ? <div className="error" role="alert">{formError}</div> : null}
 

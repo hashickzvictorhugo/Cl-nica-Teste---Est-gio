@@ -21,6 +21,18 @@ async function constantTimeEqual(left: string, right: string) {
   return difference === 0;
 }
 
+export function adminSecretsMisconfigured({
+  adminToken,
+  demoToken,
+}: {
+  adminToken?: string;
+  demoToken?: string;
+}) {
+  const full = adminToken?.trim() ?? "";
+  const demo = demoToken?.trim() ?? "";
+  return Boolean(full && demo && full === demo);
+}
+
 export async function classifyAdminCredential({
   suppliedToken,
   adminToken,
@@ -35,6 +47,7 @@ export async function classifyAdminCredential({
   const demo = demoToken?.trim() ?? "";
 
   if (!supplied) return null;
+  if (adminSecretsMisconfigured({ adminToken: full, demoToken: demo })) return null;
   if (full && await constantTimeEqual(supplied, full)) return "full";
   if (demo && await constantTimeEqual(supplied, demo)) return "demo";
   return null;

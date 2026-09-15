@@ -31,6 +31,7 @@ import {
   SCHEDULING_YEAR,
   TIMEZONE,
 } from "@/lib/scheduling";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 export const dynamic = "force-dynamic";
 
@@ -242,6 +243,9 @@ export async function POST(request: Request) {
 
   const rateLimitError = await enforceBookingRateLimit(request, patientPhone || "");
   if (rateLimitError) return rateLimitError;
+
+  const turnstileError = await verifyTurnstile(request, payload.turnstileToken);
+  if (turnstileError) return turnstileError;
 
   try {
     const holiday = await getHolidayForDate(date);

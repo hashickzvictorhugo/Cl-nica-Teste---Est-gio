@@ -113,4 +113,12 @@ if (!hasIndex("appointments_active_patient_date_start_time_unique")) {
   apply("drizzle/0006_patient_slot_uniqueness.sql");
 }
 
+if (
+  !hasTable("admin_audit_log") ||
+  !hasTrigger("admin_audit_log_no_update") ||
+  !hasTrigger("admin_audit_log_no_delete")
+) {
+  apply("drizzle/0007_admin_audit_log.sql");
+}
+
 console.log("\nSchema remoto atualizado com segurança.");

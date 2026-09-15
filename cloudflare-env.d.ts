@@ -8,5 +8,11 @@ declare namespace Cloudflare {
     BOOKING_RATE_LIMITER?: {
       limit(input: { key: string }): Promise<{ success: boolean }>;
     };
+    PUBLIC_READ_RATE_LIMITER?: {
+      limit(input: { key: string }): Promise<{ success: boolean }>;
+    };
+    ADMIN_RATE_LIMITER?: {
+      limit(input: { key: string }): Promise<{ success: boolean }>;
+    };
   }
 }

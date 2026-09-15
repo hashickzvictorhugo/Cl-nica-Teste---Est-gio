@@ -45,7 +45,7 @@ export const adminAuditLog = sqliteTable(
     appointmentId: text("appointment_id").notNull(),
     action: text("action").notNull(),
     actor: text("actor").notNull(),
-    source: text("source").notNull(),
+    source: text("source").notNull().default("APPLICATION"),
     requestId: text("request_id").notNull(),
     createdAt: text("created_at").notNull(),
   },

@@ -8,6 +8,7 @@ import {
   type AppointmentStatus,
 } from "@/lib/appointment-status";
 import { databaseError, jsonError } from "@/lib/api-response";
+import { enforceBookingRateLimit } from "@/lib/booking-rate-limit";
 import {
   getHolidayForDate,
   HolidayServiceError,
@@ -222,6 +223,9 @@ export async function POST(request: Request) {
   if (patientPhone === null) {
     return jsonError(400, "INVALID_PHONE", "Informe um telefone válido com 8 a 13 dígitos ou deixe o campo em branco.");
   }
+
+  const rateLimitError = await enforceBookingRateLimit(request, patientPhone || "");
+  if (rateLimitError) return rateLimitError;
 
   try {
     const holiday = await getHolidayForDate(date);

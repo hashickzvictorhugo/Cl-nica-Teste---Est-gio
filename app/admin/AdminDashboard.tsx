@@ -1,11 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { getAppointmentStatusLabel, type AppointmentStatus } from "@/lib/appointment-status";
 import { PROVIDERS, type Provider } from "@/lib/providers";
 
 import styles from "./admin.module.css";
+
+const ADMIN_IDLE_TIMEOUT_MS = 15 * 60 * 1_000;
 
 type Appointment = {
   id: string;
@@ -22,6 +24,15 @@ type ApiPayload = {
   appointments?: Appointment[];
   error?: { message?: string };
 };
+
+class AdminRequestError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AdminRequestError";
+    this.status = status;
+  }
+}
 
 function formatPhone(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -44,7 +55,12 @@ async function requestAppointments(token: string) {
     cache: "no-store",
   });
   const data = (await response.json()) as ApiPayload;
-  if (!response.ok) throw new Error(data.error?.message ?? "Não foi possível abrir a área administrativa.");
+  if (!response.ok) {
+    throw new AdminRequestError(
+      data.error?.message ?? "Não foi possível abrir a área administrativa.",
+      response.status,
+    );
+  }
   return data.appointments ?? [];
 }
 
@@ -59,19 +75,43 @@ export function AdminDashboard() {
   const [provider, setProvider] = useState("all");
   const [status, setStatus] = useState<AppointmentStatus | "all">("all");
 
+  const lock = useCallback((message = "") => {
+    setToken("");
+    setAppointments([]);
+    setTokenInput("");
+    setLoading(false);
+    setError(message);
+  }, []);
+
   useEffect(() => {
     const handlePageShow = (event: PageTransitionEvent) => {
-      if (!event.persisted) return;
-      setToken("");
-      setAppointments([]);
-      setTokenInput("");
-      setError("");
-      setLoading(false);
+      if (event.persisted) lock();
     };
-
     window.addEventListener("pageshow", handlePageShow);
     return () => window.removeEventListener("pageshow", handlePageShow);
-  }, []);
+  }, [lock]);
+
+  useEffect(() => {
+    if (!token) return;
+    let timer = window.setTimeout(
+      () => lock("Sessão encerrada após 15 minutos de inatividade."),
+      ADMIN_IDLE_TIMEOUT_MS,
+    );
+    const renew = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(
+        () => lock("Sessão encerrada após 15 minutos de inatividade."),
+        ADMIN_IDLE_TIMEOUT_MS,
+      );
+    };
+    window.addEventListener("pointerdown", renew, { passive: true });
+    window.addEventListener("keydown", renew);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pointerdown", renew);
+      window.removeEventListener("keydown", renew);
+    };
+  }, [lock, token]);
 
   async function unlock(candidate: string) {
     setLoading(true);
@@ -82,9 +122,7 @@ export function AdminDashboard() {
       setToken(candidate);
       setTokenInput("");
     } catch (err) {
-      setAppointments([]);
-      setToken("");
-      setError(err instanceof Error ? err.message : "Falha na autenticação.");
+      lock(err instanceof Error ? err.message : "Falha na autenticação.");
     } finally {
       setLoading(false);
     }
@@ -97,6 +135,10 @@ export function AdminDashboard() {
     try {
       setAppointments(await requestAppointments(token));
     } catch (err) {
+      if (err instanceof AdminRequestError && (err.status === 401 || err.status === 429)) {
+        lock(err.message);
+        return;
+      }
       setError(err instanceof Error ? err.message : "Não foi possível atualizar a agenda.");
     } finally {
       setLoading(false);
@@ -129,7 +171,13 @@ export function AdminDashboard() {
         },
       );
       const data = (await response.json()) as ApiPayload;
-      if (!response.ok) throw new Error(data.error?.message ?? "Não foi possível atualizar a consulta.");
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 429) {
+          lock(data.error?.message ?? "Sessão administrativa encerrada.");
+          return;
+        }
+        throw new Error(data.error?.message ?? "Não foi possível atualizar a consulta.");
+      }
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível atualizar a consulta.");
@@ -178,9 +226,9 @@ export function AdminDashboard() {
           <button className={styles.primary} disabled={loading || !tokenInput.trim()} type="submit">
             {loading ? "Validando…" : "Entrar no painel"}
           </button>
-          {error ? <div className={styles.message}>{error}</div> : null}
+          {error ? <div className={styles.message} role="alert">{error}</div> : null}
         </form>
-        <div className={styles.notice}>A credencial é mantida somente na memória desta página. Ao sair do painel, recarregar ou voltar pelo histórico do navegador, será necessário autenticar novamente.</div>
+        <div className={styles.notice}>A credencial fica somente na memória da página. A sessão é encerrada ao recarregar, voltar pelo histórico ou após 15 minutos de inatividade.</div>
       </div>
     );
   }
@@ -192,15 +240,13 @@ export function AdminDashboard() {
           <h2>Operação da clínica</h2>
           <p>Dados pessoais e ações administrativas protegidos por autenticação no backend.</p>
         </div>
-        <button className={styles.ghost} onClick={() => {
-          setToken("");
-          setAppointments([]);
-          setTokenInput("");
-          setError("");
-        }} type="button">Sair</button>
+        <div className={styles.actions}>
+          <button className={styles.ghost} disabled={loading} onClick={() => void refresh()} type="button">Atualizar</button>
+          <button className={styles.ghost} onClick={() => lock()} type="button">Sair</button>
+        </div>
       </div>
 
-      <div className={styles.metrics}>
+      <div className={styles.metrics} aria-label="Resumo da agenda">
         <div className={styles.metric}><strong>{confirmed}</strong><span>confirmadas</span></div>
         <div className={styles.metric}><strong>{completed}</strong><span>concluídas</span></div>
         <div className={styles.metric}><strong>{cancelled}</strong><span>canceladas</span></div>
@@ -214,8 +260,8 @@ export function AdminDashboard() {
         <label>Status<select onChange={(event) => setStatus(event.target.value as AppointmentStatus | "all")} value={status}><option value="all">Todos</option><option value="CONFIRMED">Confirmados</option><option value="COMPLETED">Concluídos</option><option value="CANCELLED">Cancelados</option></select></label>
       </div>
 
-      {error ? <div className={styles.message}>{error}</div> : null}
-      {loading ? <div className={styles.loading}>Atualizando agenda…</div> : null}
+      {error ? <div className={styles.message} role="alert">{error}</div> : null}
+      {loading ? <div className={styles.loading} role="status">Atualizando agenda…</div> : null}
 
       {!loading && filtered.length === 0 ? (
         <div className={styles.empty}>Nenhum registro encontrado.</div>

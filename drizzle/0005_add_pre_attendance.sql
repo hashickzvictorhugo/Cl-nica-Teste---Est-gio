@@ -1,7 +1,5 @@
-ALTER TABLE `appointments` ADD COLUMN `visit_reason` text;
-ALTER TABLE `appointments` ADD COLUMN `symptom_duration` text;
-ALTER TABLE `appointments` ADD COLUMN `visit_type` text;
-ALTER TABLE `appointments` ADD COLUMN `patient_notes` text;
+-- As colunas desta etapa são adicionadas individualmente e de forma idempotente
+-- por scripts/migrate-production.mjs antes da criação dos triggers abaixo.
 
 CREATE TRIGGER IF NOT EXISTS appointments_validate_pre_attendance_insert
 BEFORE INSERT ON appointments

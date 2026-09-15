@@ -2,7 +2,7 @@
 
 Este repositório é um case técnico demonstrativo, mas a arquitetura foi endurecida para separar claramente o que é público do que contém dados pessoais ou altera a operação da clínica.
 
-> O ambiente demonstrativo não deve receber prontuário, diagnóstico, documentos, dados financeiros ou outros dados clínicos sensíveis.
+> O ambiente demonstrativo deve usar apenas dados fictícios. O pré-atendimento não é prontuário, não faz diagnóstico ou classificação de risco e não deve receber dados reais de saúde, documentos, dados financeiros ou histórico clínico detalhado.
 
 ## Modelo de acesso
 
@@ -10,15 +10,18 @@ Este repositório é um case técnico demonstrativo, mas a arquitetura foi endur
 
 Pode apenas:
 
+- preencher uma prévia curta de atendimento;
 - consultar disponibilidade por profissional;
 - buscar o próximo horário livre;
 - criar um novo agendamento.
 
-`GET /appointments` sem escopo administrativo não entrega nomes, telefones ou histórico. A confirmação pública de um novo agendamento também retorna apenas o mínimo necessário: protocolo, data, horário, profissional e status.
+A prévia coleta nome, telefone/WhatsApp, motivo da consulta, tipo de consulta, duração opcional dos sintomas e observações opcionais. Esses campos existem somente para demonstrar organização de fluxo e não geram diagnóstico, triagem automática, classificação de risco nem recomendação médica.
+
+`GET /appointments` sem escopo administrativo não entrega nomes, telefones, pré-atendimento ou histórico. A confirmação pública de um novo agendamento também retorna apenas o mínimo necessário: protocolo, data, horário, profissional e status.
 
 ### Área administrativa completa
 
-`/admin` permite consultar nome/telefone, histórico e executar ações operacionais. A API aceita a credencial completa via:
+`/admin` permite consultar nome/telefone, pré-atendimento, histórico e executar ações operacionais. A API aceita a credencial completa via:
 
 ```text
 Authorization: Bearer <ADMIN_TOKEN>
@@ -32,7 +35,7 @@ Uma segunda credencial opcional, `DEMO_ADMIN_TOKEN`, permite que um avaliador ab
 
 Quando a credencial demo é usada:
 
-- `GET /appointments?scope=admin` retorna somente um dataset estático e explicitamente fictício;
+- `GET /appointments?scope=admin` retorna somente um dataset estático e explicitamente fictício, inclusive nos campos de pré-atendimento;
 - nenhum registro real do banco é retornado;
 - `PATCH` e `DELETE` são bloqueados no backend com `403 ADMIN_READ_ONLY`;
 - concluir, cancelar e contato via WhatsApp ficam indisponíveis no painel;
@@ -79,17 +82,19 @@ pnpm.cmd run release
 ### Privacidade
 
 - a área pública não lista registros de pacientes;
+- nome, telefone, motivo, duração, tipo de consulta e observações não aparecem na confirmação pública;
 - o modo demo não lista registros operacionais reais;
-- o dataset demo usa apenas nomes e telefones fictícios identificados como demonstração;
-- respostas públicas de criação são minimizadas e não repetem nome/telefone;
+- o dataset demo usa apenas nomes, telefones e textos de pré-atendimento fictícios identificados como demonstração;
+- respostas públicas de criação são minimizadas e não repetem PII nem conteúdo da prévia;
 - respostas administrativas e sensíveis usam `Cache-Control: no-store`;
+- o formulário pede apenas os campos necessários ao fluxo demonstrativo e evita CPF, RG, endereço, medicamentos e histórico clínico detalhado;
 - nenhum segredo é armazenado no código-fonte;
 - arquivos `.env*`, estado local do Wrangler e artefatos de ferramentas ficam fora do Git.
 
 ### Antiabuso
 
 - rate limiting no edge por endereço de origem;
-- segundo limite por telefone quando o contato é informado;
+- segundo limite por telefone;
 - honeypot silencioso no formulário público;
 - integração opcional com Cloudflare Turnstile, validada novamente no backend;
 - limite real de 8 KiB para JSON, medido em bytes mesmo quando `Content-Length` está ausente ou incorreto.
@@ -106,11 +111,14 @@ A chave pública é entregue ao frontend por `/security-config`; a chave secreta
 ### Validação e integridade
 
 - regras de negócio revalidadas no backend;
+- pré-atendimento validado novamente no backend, sem confiar no formulário do navegador;
+- telefone obrigatório no novo fluxo e normalizado antes da persistência;
+- motivo limitado a 5–300 caracteres, observações a 500 caracteres e enums fechados para tipo/duração;
 - datas e horários interpretados em `America/Sao_Paulo`;
 - Drizzle ORM nas consultas ao D1;
 - índice único parcial impede dois agendamentos ativos do mesmo profissional/data/horário;
 - `CHECK` de horários e status no banco;
-- triggers defensivas validam nome, telefone, profissional e ano também no D1;
+- triggers defensivas validam nome, telefone, profissional, ano e os novos campos de pré-atendimento também no D1;
 - cancelamento lógico preserva histórico e libera o slot;
 - estados concluído/cancelado não são reativados;
 - horários passados e janela mínima de antecedência são rejeitados pelo servidor.
@@ -140,6 +148,8 @@ A CSP bloqueia objetos, frames externos não autorizados, handlers inline de scr
 
 ## Limites deliberados do case
 
-Para uma clínica real, a autenticação por tokens compartilhados deveria ser substituída por identidade individual por funcionário, MFA, RBAC, rotação/revogação de sessão, trilha de auditoria imutável, política formal de retenção/eliminação de PII, observabilidade de segurança e gestão operacional de incidentes.
+A etapa de pré-atendimento é uma simulação de organização do atendimento. Ela não substitui anamnese, avaliação profissional, serviço de emergência ou sistema clínico adequado e não deve ser usada para tomar decisões médicas.
+
+Para uma clínica real, a autenticação por tokens compartilhados deveria ser substituída por identidade individual por funcionário, MFA, RBAC, rotação/revogação de sessão, trilha de auditoria imutável, criptografia e governança compatíveis com dados de saúde, política formal de retenção/eliminação de PII, observabilidade de segurança e gestão operacional de incidentes.
 
 Esses limites são documentados para não confundir um case demonstrativo com um sistema clínico pronto para processamento de dados de saúde em produção.

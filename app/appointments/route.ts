@@ -11,8 +11,11 @@ import {
   isAppointmentStatus,
   type AppointmentStatus,
 } from "@/lib/appointment-status";
-import { databaseError, jsonError } from "@/lib/api-response";
-import { enforceBookingRateLimit } from "@/lib/booking-rate-limit";
+import { databaseError, isUniqueConstraintError, jsonError } from "@/lib/api-response";
+import {
+  enforceBookingPhoneRateLimit,
+  enforceBookingRequestRateLimit,
+} from "@/lib/booking-rate-limit";
 import { filterDemoAppointments } from "@/lib/demo-appointments";
 import {
   getHolidayForDate,
@@ -99,6 +102,20 @@ function jsonBodyError(error: unknown, fallback: string) {
     return jsonError(error.status, error.code, error.message);
   }
   return jsonError(400, "VALIDATION_ERROR", fallback);
+}
+
+function rejectCrossSiteMutation(request: Request) {
+  const expectedOrigin = new URL(request.url).origin;
+  const origin = request.headers.get("Origin")?.trim();
+  const fetchSite = request.headers.get("Sec-Fetch-Site")?.trim().toLowerCase();
+  if ((origin && origin !== expectedOrigin) || fetchSite === "cross-site") {
+    return jsonError(
+      403,
+      "CROSS_SITE_REQUEST_REJECTED",
+      "A solicitação foi bloqueada porque não veio da origem autorizada.",
+    );
+  }
+  return null;
 }
 
 async function patientHasConflict({
@@ -238,6 +255,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const originError = rejectCrossSiteMutation(request);
+  if (originError) return originError;
+
+  const requestRateLimitError = await enforceBookingRequestRateLimit(request);
+  if (requestRateLimitError) return requestRateLimitError;
+
   let payload: Record<string, unknown>;
   try {
     payload = await readJsonObject(request);
@@ -297,15 +320,17 @@ export async function POST(request: Request) {
     return jsonError(400, "INVALID_PATIENT_NOTES", "As observações adicionais devem ter no máximo 500 caracteres.");
   }
 
-  const rateLimitError = await enforceBookingRateLimit(request, patientPhone);
-  if (rateLimitError) return rateLimitError;
+  const phoneRateLimitError = await enforceBookingPhoneRateLimit(patientPhone);
+  if (phoneRateLimitError) return phoneRateLimitError;
 
   const turnstileError = await verifyTurnstile(request, payload.turnstileToken);
   if (turnstileError) return turnstileError;
 
   try {
+    if (isWeekend(date)) {
+      return jsonError(422, "WEEKEND", "A clínica não abre aos fins de semana. Escolha um dia útil.");
+    }
     const holiday = await getHolidayForDate(date);
-    if (isWeekend(date)) return jsonError(422, "WEEKEND", "A clínica não abre aos fins de semana. Escolha um dia útil.");
     if (holiday) return jsonError(422, "HOLIDAY", `Não há atendimento em ${holiday.localName}. Escolha outra data.`);
 
     if (await patientHasConflict({ patientPhone, date, startTime })) {
@@ -336,7 +361,11 @@ export async function POST(request: Request) {
       .returning();
 
     if (created.length === 0) {
-      return jsonError(409, "SLOT_TAKEN", `Esse horário com ${provider.name} acabou de ser reservado. Escolha outro.`);
+      return jsonError(
+        409,
+        "SLOT_TAKEN",
+        "O horário entrou em conflito com outro agendamento. Atualize a disponibilidade e escolha outro horário.",
+      );
     }
 
     return Response.json(
@@ -354,6 +383,9 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const authError = await requireFullAdmin(request);
   if (authError) return authError;
+
+  const originError = rejectCrossSiteMutation(request);
+  if (originError) return originError;
 
   let payload: Record<string, unknown>;
   try {
@@ -397,8 +429,10 @@ export async function PATCH(request: Request) {
         );
       }
 
+      if (isWeekend(date)) {
+        return jsonError(422, "WEEKEND", "A clínica não abre aos fins de semana. Escolha um dia útil.");
+      }
       const holiday = await getHolidayForDate(date);
-      if (isWeekend(date)) return jsonError(422, "WEEKEND", "A clínica não abre aos fins de semana. Escolha um dia útil.");
       if (holiday) return jsonError(422, "HOLIDAY", `Não há atendimento em ${holiday.localName}. Escolha outra data.`);
 
       if (await providerSlotTaken({ providerId: provider.id, date, startTime, excludeId: id })) {
@@ -419,8 +453,16 @@ export async function PATCH(request: Request) {
           providerId: provider.id,
           updatedAt: schedulingNow.toISOString(),
         })
-        .where(eq(appointments.id, id))
+        .where(and(eq(appointments.id, id), eq(appointments.status, "CONFIRMED")))
         .returning();
+
+      if (updated.length === 0) {
+        return jsonError(
+          409,
+          "CONCURRENT_MODIFICATION",
+          "O agendamento foi alterado por outra operação. Atualize a agenda antes de tentar novamente.",
+        );
+      }
 
       return Response.json(
         { message: "Agendamento remarcado com sucesso.", appointment: presentAdminAppointment(updated[0]) },
@@ -457,8 +499,16 @@ export async function PATCH(request: Request) {
     const updated = await getDb()
       .update(appointments)
       .set({ status: "COMPLETED", updatedAt: now, completedAt: now })
-      .where(eq(appointments.id, id))
+      .where(and(eq(appointments.id, id), eq(appointments.status, "CONFIRMED")))
       .returning();
+
+    if (updated.length === 0) {
+      return jsonError(
+        409,
+        "CONCURRENT_MODIFICATION",
+        "O agendamento foi alterado por outra operação. Atualize a agenda antes de tentar novamente.",
+      );
+    }
 
     return Response.json(
       { message: "Consulta marcada como concluída.", appointment: presentAdminAppointment(updated[0]) },
@@ -468,6 +518,13 @@ export async function PATCH(request: Request) {
     if (error instanceof HolidayServiceError) {
       return jsonError(503, "HOLIDAY_SERVICE_UNAVAILABLE", "Não foi possível verificar os feriados agora. Tente novamente em instantes.");
     }
+    if (isUniqueConstraintError(error)) {
+      return jsonError(
+        409,
+        "SLOT_TAKEN",
+        "O novo horário entrou em conflito com outro agendamento. Atualize a agenda e tente novamente.",
+      );
+    }
     return databaseError(error);
   }
 }
@@ -475,6 +532,9 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   const authError = await requireFullAdmin(request);
   if (authError) return authError;
+
+  const originError = rejectCrossSiteMutation(request);
+  if (originError) return originError;
 
   const id = new URL(request.url).searchParams.get("id")?.trim();
   if (!id) return jsonError(400, "VALIDATION_ERROR", "Informe o agendamento que deseja cancelar.");
@@ -508,8 +568,16 @@ export async function DELETE(request: Request) {
     const cancelled = await getDb()
       .update(appointments)
       .set({ status: "CANCELLED", updatedAt: now, cancelledAt: now, completedAt: null })
-      .where(eq(appointments.id, id))
+      .where(and(eq(appointments.id, id), eq(appointments.status, "CONFIRMED")))
       .returning();
+
+    if (cancelled.length === 0) {
+      return jsonError(
+        409,
+        "CONCURRENT_MODIFICATION",
+        "O agendamento foi alterado por outra operação. Atualize a agenda antes de tentar novamente.",
+      );
+    }
 
     return Response.json(
       { message: "Agendamento cancelado e mantido no histórico.", appointment: presentAdminAppointment(cancelled[0]) },

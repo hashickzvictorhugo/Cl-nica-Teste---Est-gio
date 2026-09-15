@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { TURNSTILE_ACTION } from "@/lib/turnstile";
+import { TURNSTILE_ACTION } from "@/lib/security-constants";
 
 type SecurityConfig = {
   turnstile?: {

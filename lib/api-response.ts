@@ -21,6 +21,8 @@ export type ApiErrorCode =
   | "INVALID_PROVIDER"
   | "INVALID_STATUS"
   | "INVALID_TRANSITION"
+  | "CONCURRENT_MODIFICATION"
+  | "CROSS_SITE_REQUEST_REJECTED"
   | "APPOINTMENT_NOT_FINISHED"
   | "WEEKEND"
   | "HOLIDAY"
@@ -35,6 +37,11 @@ export function jsonError(status: number, code: ApiErrorCode, message: string) {
     { error: { code, message } },
     { status, headers: { "Cache-Control": "no-store" } },
   );
+}
+
+export function isUniqueConstraintError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /unique constraint failed|constraint_unique/i.test(message);
 }
 
 export function databaseError(error: unknown) {

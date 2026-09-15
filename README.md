@@ -18,12 +18,18 @@ Além dos requisitos mínimos do desafio, o projeto inclui:
 - quatro profissionais fictícios com especialidades diferentes;
 - disponibilidade exibida individualmente em cada card de profissional;
 - busca de **próximo horário disponível** entre médicos, datas e horários;
+- bloqueio automático de horários que já passaram no dia atual;
+- antecedência mínima de **30 minutos** para novos agendamentos e remarcações;
 - o mesmo horário pode ser usado por profissionais diferentes;
-- bloqueio de conflito apenas quando **profissional + data + horário** coincidem;
+- bloqueio de conflito quando **profissional + data + horário** coincidem;
+- bloqueio de duas consultas simultâneas para o mesmo paciente quando há telefone informado;
 - telefone/WhatsApp opcional do paciente;
 - botão para abrir o WhatsApp com uma mensagem de confirmação pronta — sem simular integração automática com a plataforma;
 - status `CONFIRMED`, `COMPLETED` e `CANCELLED`;
 - cancelamento lógico: o registro continua no histórico e o horário é liberado para nova reserva;
+- política de cancelamento com antecedência mínima de **60 minutos**;
+- conclusão permitida apenas depois do término real do horário reservado;
+- remarcação no mesmo registro, preservando o histórico do agendamento;
 - painel operacional com busca e filtros por data, profissional e status;
 - métricas de consultas confirmadas, concluídas e canceladas;
 - modal próprio de confirmação, toasts, skeletons e mensagens de erro específicas;
@@ -65,14 +71,14 @@ Paciente
    ├── escolhe profissional + data
    │        │
    │        └── GET /available
-   │             ├── valida data e dia útil
+   │             ├── valida data, horário atual e antecedência mínima
    │             ├── consulta feriados Nager.Date
    │             └── consulta conflitos ativos do profissional no D1
    │
    ├── ou usa “Encontrar próximo horário”
    │        │
    │        └── GET /next-available
-   │             └── procura a primeira combinação livre de data + horário + profissional
+   │             └── procura a primeira combinação futura e válida de data + horário + profissional
    │
    ▼
 Seleciona horário e informa paciente
@@ -81,6 +87,7 @@ Seleciona horário e informa paciente
 POST /appointments
    │
    ├── revalida todas as regras
+   ├── evita sobreposição do mesmo paciente quando há telefone
    └── persiste no D1
    │
    ▼
@@ -94,11 +101,19 @@ Agendamento confirmado
 - consultas de **1 hora**;
 - horários de início permitidos: `08:00` até `17:00`;
 - feriados nacionais de 2026 e finais de semana são bloqueados;
+- datas passadas não aceitam novos agendamentos;
+- no dia atual, horários já iniciados ou dentro da janela mínima de 30 minutos não ficam disponíveis;
+- a busca de próximo horário ignora automaticamente slots vencidos ou próximos demais;
 - cada profissional possui agenda independente;
 - o mesmo horário pode existir simultaneamente para profissionais diferentes;
 - o mesmo profissional não pode ter dois agendamentos ativos na mesma data e horário;
+- quando há telefone, o paciente não pode manter duas consultas ativas no mesmo horário;
 - agendamentos cancelados continuam no histórico, mas deixam de bloquear o horário;
+- cancelamentos são permitidos até 60 minutos antes da consulta;
 - consultas concluídas continuam contando como ocupação daquele registro;
+- uma consulta só pode ser concluída depois do término do horário reservado;
+- consultas concluídas e canceladas são estados terminais;
+- remarcação é permitida apenas para consultas confirmadas e revalida data, feriado, profissional, conflito e antecedência;
 - nome do paciente: 2–80 caracteres após normalização;
 - telefone/WhatsApp opcional: 8–13 dígitos após normalização;
 - datas usam `AAAA-MM-DD`;
@@ -121,39 +136,19 @@ A lista de feriados fica em cache por seis horas. Se a Nager.Date não puder ser
 
 ## Endpoints
 
-### `GET /available?date=2026-02-10&providerId=ana-martins`
+### `GET /available?date=2026-09-14&providerId=ana-martins`
 
-Retorna a agenda de um profissional, o dia da semana, fuso, feriado e os dez slots com disponibilidade. `providerId` é opcional por compatibilidade; quando omitido, o primeiro profissional é usado.
+Retorna a agenda de um profissional, o dia da semana, fuso, feriado e os dez slots com disponibilidade. O retorno também inclui a política de antecedência mínima e o motivo de indisponibilidade de slots bloqueados. `providerId` é opcional por compatibilidade; quando omitido, o primeiro profissional é usado.
 
-### `GET /next-available?fromDate=2026-02-10&providerId=all`
+### `GET /next-available?fromDate=2026-09-14&providerId=all`
 
-Procura o primeiro horário livre a partir da data informada. Com `providerId=all`, considera toda a equipe; também aceita um ID específico de profissional.
-
-Exemplo:
-
-```json
-{
-  "fromDate": "2026-02-10",
-  "date": "2026-02-10",
-  "weekday": "terça-feira",
-  "timezone": "America/Sao_Paulo",
-  "provider": {
-    "id": "lucas-ferreira",
-    "name": "Dr. Lucas Ferreira",
-    "specialty": "Cardiologia"
-  },
-  "slot": {
-    "startTime": "08:00",
-    "endTime": "09:00"
-  }
-}
-```
+Procura o primeiro horário livre a partir da data informada. Com `providerId=all`, considera toda a equipe; também aceita um ID específico de profissional. Horários passados e slots dentro da antecedência mínima são ignorados automaticamente.
 
 ### `POST /appointments`
 
 ```json
 {
-  "date": "2026-02-10",
+  "date": "2026-09-15",
   "startTime": "09:00",
   "providerId": "ana-martins",
   "patientName": "Maria Silva",
@@ -161,22 +156,22 @@ Exemplo:
 }
 ```
 
-Reserva válida retorna `201`. Conflito do mesmo profissional retorna `409`.
+Reserva válida retorna `201`. Entre os conflitos possíveis estão `SLOT_TAKEN`, `PATIENT_CONFLICT` e `BOOKING_TOO_SOON`.
 
 ### `GET /appointments`
 
 Retorna até 200 registros com profissional, paciente, data, horário, telefone e status. Suporta filtros opcionais:
 
 ```text
-?date=2026-02-10
+?date=2026-09-15
 &providerId=ana-martins
 &status=CONFIRMED
 &q=Maria
 ```
 
-### `PATCH /appointments`
+### `PATCH /appointments` — concluir
 
-Permite marcar uma consulta ativa como concluída ou restaurar de concluída para confirmada:
+Marca uma consulta confirmada como concluída, somente depois do término do horário reservado:
 
 ```json
 {
@@ -185,11 +180,27 @@ Permite marcar uma consulta ativa como concluída ou restaurar de concluída par
 }
 ```
 
-Consultas canceladas são terminais no histórico e não podem ser reativadas.
+Consultas concluídas e canceladas permanecem como estados terminais no histórico.
+
+### `PATCH /appointments` — remarcar
+
+Remarca uma consulta confirmada sem criar um segundo registro:
+
+```json
+{
+  "id": "appointment-id",
+  "action": "RESCHEDULE",
+  "date": "2026-09-16",
+  "startTime": "15:00",
+  "providerId": "lucas-ferreira"
+}
+```
+
+A remarcação revalida antecedência mínima, dia útil, feriado, conflito do profissional e eventual sobreposição do paciente.
 
 ### `DELETE /appointments?id=<id>`
 
-Faz **cancelamento lógico**. O registro recebe `CANCELLED`, continua visível no histórico e o slot volta a ficar disponível.
+Faz **cancelamento lógico** quando ainda existe pelo menos 60 minutos de antecedência. O registro recebe `CANCELLED`, continua visível no histórico e o slot volta a ficar disponível.
 
 ## Profissionais do ambiente demonstrativo
 
@@ -257,49 +268,3 @@ pnpm run typecheck
 pnpm run test
 pnpm run build
 ```
-
-Os testes validam datas, finais de semana, slots, normalização de dados, serviço de feriados, cache, agenda por profissional, concorrência, liberação de slots cancelados, restrições de status e busca do próximo horário.
-
-## Estrutura principal
-
-```text
-app/
-  available/route.ts
-  next-available/route.ts
-  appointments/route.ts
-  components/SchedulingApp.tsx
-  globals.css
-  provider.css
-
-db/
-  index.ts
-  schema.ts
-
-drizzle/
-  bootstrap.sql
-  0000_quick_leopardon.sql
-  0001_add_patient_phone.sql
-  0002_add_provider_schedule.sql
-  0003_add_appointment_status.sql
-
-lib/
-  api-response.ts
-  appointment-status.ts
-  holiday-service.ts
-  next-availability.ts
-  providers.ts
-  scheduling.ts
-
-scripts/
-  migrate-production.mjs
-
-tests/
-  database-schema.test.ts
-  holiday-service.test.ts
-  next-availability.test.ts
-  scheduling.test.ts
-```
-
-## Privacidade
-
-É um projeto demonstrativo. Os profissionais são fictícios e a interface orienta o uso de dados fictícios. Não deve ser usada como sistema clínico real nem para armazenar dados reais de pacientes.

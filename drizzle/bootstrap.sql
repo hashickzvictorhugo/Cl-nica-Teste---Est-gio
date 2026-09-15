@@ -22,6 +22,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS `appointments_active_provider_date_start_time_
 ON `appointments` (`provider_id`, `appointment_date`, `start_time`)
 WHERE `status` <> 'CANCELLED';
 
+CREATE UNIQUE INDEX IF NOT EXISTS `appointments_active_patient_date_start_time_unique`
+ON `appointments` (`patient_phone`, `appointment_date`, `start_time`)
+WHERE `status` <> 'CANCELLED' AND `patient_phone` IS NOT NULL;
+
 CREATE TRIGGER IF NOT EXISTS appointments_validate_insert
 BEFORE INSERT ON appointments
 BEGIN

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { TURNSTILE_ACTION } from "@/lib/turnstile";
+
 type SecurityConfig = {
   turnstile?: {
     enabled?: boolean;
@@ -12,6 +14,7 @@ type SecurityConfig = {
 type TurnstileApi = {
   render(container: HTMLElement, options: {
     sitekey: string;
+    action?: string;
     theme?: "light" | "dark" | "auto";
     callback(token: string): void;
     "expired-callback"?(): void;
@@ -92,6 +95,7 @@ export function TurnstileWidget({
       containerRef.current.replaceChildren();
       window.turnstile.render(containerRef.current, {
         sitekey: siteKey,
+        action: TURNSTILE_ACTION,
         theme: "light",
         callback: (token) => {
           onToken(token);
@@ -116,7 +120,16 @@ export function TurnstileWidget({
     void renderWidget();
   }, [renderWidget, resetKey]);
 
-  if (!enabled) return null;
+  if (!enabled) {
+    return (
+      <div className="security-check" role="alert">
+        <div>
+          <strong>Verificação de segurança indisponível</strong>
+          <span>O agendamento permanece bloqueado até a proteção anti-bot estar disponível.</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="security-check" aria-live="polite">

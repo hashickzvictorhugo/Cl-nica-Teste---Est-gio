@@ -52,11 +52,14 @@ function insert(
 test("database prevents two active appointments with the same professional and slot", () => {
   const db = database();
   insert(db, { id: "first" });
-  assert.throws(() => insert(db, { id: "second", name: "João" }), /UNIQUE constraint failed/);
+  assert.throws(
+    () => insert(db, { id: "second", name: "João", phone: "18999999998" }),
+    /UNIQUE constraint failed/,
+  );
   db.close();
 });
 
-test("database allows the same time for different professionals", () => {
+test("database allows the same time for different professionals and different patients", () => {
   const db = database();
   insert(db, { id: "first" });
   insert(db, { id: "second", provider: "lucas-ferreira", name: "João", phone: "18999999998" });
@@ -66,11 +69,32 @@ test("database allows the same time for different professionals", () => {
   db.close();
 });
 
-test("cancelled appointments keep history and release the slot", () => {
+test("database prevents the same patient phone from booking two active appointments at the same time", () => {
   const db = database();
-  insert(db, { id: "first", time: "10:00" });
+  insert(db, { id: "first", phone: "18999999999" });
+  assert.throws(
+    () => insert(db, {
+      id: "second",
+      provider: "lucas-ferreira",
+      name: "Maria",
+      phone: "18999999999",
+    }),
+    /UNIQUE constraint failed/,
+  );
+  db.close();
+});
+
+test("cancelled appointments keep history and release provider and patient slot", () => {
+  const db = database();
+  insert(db, { id: "first", time: "10:00", phone: "18999999999" });
   db.prepare("UPDATE appointments SET status = 'CANCELLED' WHERE id = 'first'").run();
-  insert(db, { id: "second", time: "10:00", name: "João", phone: "18999999998" });
+  insert(db, {
+    id: "second",
+    time: "10:00",
+    provider: "lucas-ferreira",
+    name: "João",
+    phone: "18999999999",
+  });
 
   const count = db.prepare("SELECT COUNT(*) AS total FROM appointments").get() as { total: number };
   assert.equal(count.total, 2);

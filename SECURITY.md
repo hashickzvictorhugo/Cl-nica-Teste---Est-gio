@@ -1,38 +1,34 @@
 # Segurança — Garde Agenda
 
-Este projeto é um case técnico demonstrativo. Mesmo assim, as rotas que expõem dados pessoais ou alteram o histórico da clínica são protegidas no backend.
+Este repositório é um case técnico demonstrativo, mas a arquitetura foi endurecida para separar claramente o que é público do que contém dados pessoais ou altera a operação da clínica.
+
+> O ambiente demonstrativo não deve receber prontuário, diagnóstico, documentos, dados financeiros ou outros dados clínicos sensíveis.
 
 ## Modelo de acesso
 
-A área pública pode:
+### Área pública
 
-- consultar disponibilidade;
+Pode apenas:
+
+- consultar disponibilidade por profissional;
 - buscar o próximo horário livre;
 - criar um novo agendamento.
 
-A área administrativa pode:
+`GET /appointments` sem escopo administrativo não entrega nomes, telefones ou histórico. A confirmação pública de um novo agendamento também retorna apenas o mínimo necessário: protocolo, data, horário, profissional e status.
 
-- listar nome e telefone dos pacientes;
-- consultar o histórico completo;
-- concluir consultas;
-- cancelar consultas;
-- remarcar consultas pela API.
+### Área administrativa
 
-Essas operações exigem um token administrativo enviado no header HTTP:
+`/admin` permite consultar nome/telefone, histórico e executar ações operacionais. A API exige:
 
 ```text
 Authorization: Bearer <ADMIN_TOKEN>
 ```
 
-O segredo nunca deve ser gravado no GitHub, no código-fonte ou em arquivos públicos.
+O `ADMIN_TOKEN` é um secret do Cloudflare Worker e nunca deve ser colocado no GitHub, no JavaScript público ou em arquivos `.env` versionados.
 
-## Configurando o segredo no Cloudflare Workers
+A credencial digitada no painel fica somente na memória do componente. Ela é descartada ao sair/recarregar a página, ao restaurar a página pelo histórico/bfcache e após 15 minutos de inatividade.
 
-Execute na pasta do projeto:
-
-```bash
-pnpm exec wrangler secret put ADMIN_TOKEN
-```
+## Configuração do acesso administrativo
 
 No Windows/PowerShell:
 
@@ -40,45 +36,85 @@ No Windows/PowerShell:
 pnpm.cmd exec wrangler secret put ADMIN_TOKEN
 ```
 
-O Wrangler solicitará o valor do segredo de forma interativa. Use uma credencial longa e aleatória.
-
-Depois publique novamente:
+Use uma credencial longa, exclusiva e aleatória. Em seguida, publique pelo fluxo de release, que também verifica as migrações do D1:
 
 ```powershell
-pnpm.cmd run deploy
+pnpm.cmd run release
 ```
-
-## Painel administrativo
-
-Após configurar o segredo, abra:
-
-```text
-/admin
-```
-
-A credencial digitada no painel é mantida apenas em `sessionStorage`, portanto fica limitada àquela aba/sessão do navegador. Ela não é salva no código-fonte.
 
 ## Proteções implementadas
 
-- autenticação server-side para dados pessoais e ações administrativas;
+### Autenticação e autorização
+
+- autenticação server-side para listagem de PII e ações administrativas;
 - falha fechada quando `ADMIN_TOKEN` não está configurado;
-- comparação da credencial por digest SHA-256 antes da comparação byte a byte;
-- listagem pública de `/appointments` não retorna registros de pacientes;
-- `PATCH` e `DELETE` de agendamentos exigem autenticação;
-- limite básico de tamanho para payloads JSON de escrita;
-- validação de regras de negócio no backend;
-- queries construídas com Drizzle ORM;
-- índice único no banco para impedir conflito ativo de profissional + data + horário;
-- `Cache-Control: no-store` em respostas sensíveis;
-- Content Security Policy (CSP);
+- comparação do token por digest SHA-256 e comparação byte a byte;
+- limitação de tentativas administrativas por origem;
+- sessão administrativa somente em memória, com expiração por inatividade;
+- `/admin` marcado como `noindex, nofollow`.
+
+### Privacidade
+
+- a área pública não lista registros de pacientes;
+- respostas públicas de criação são minimizadas e não repetem nome/telefone;
+- respostas administrativas e sensíveis usam `Cache-Control: no-store`;
+- nenhum segredo é armazenado no código-fonte;
+- arquivos `.env*`, estado local do Wrangler e artefatos de ferramentas ficam fora do Git.
+
+### Antiabuso
+
+- rate limiting no edge por endereço de origem;
+- segundo limite por telefone quando o contato é informado;
+- honeypot silencioso no formulário público;
+- integração opcional com Cloudflare Turnstile, validada novamente no backend;
+- limite real de 8 KiB para JSON, medido em bytes mesmo quando `Content-Length` está ausente ou incorreto.
+
+O Turnstile só é ativado quando **as duas** variáveis abaixo estão configuradas no Worker:
+
+```text
+TURNSTILE_SITE_KEY
+TURNSTILE_SECRET_KEY
+```
+
+A chave pública é entregue ao frontend por `/security-config`; a chave secreta nunca é retornada ao navegador.
+
+### Validação e integridade
+
+- regras de negócio revalidadas no backend;
+- datas e horários interpretados em `America/Sao_Paulo`;
+- Drizzle ORM nas consultas ao D1;
+- índice único parcial impede dois agendamentos ativos do mesmo profissional/data/horário;
+- `CHECK` de horários e status no banco;
+- triggers defensivas validam nome, telefone, profissional e ano também no D1;
+- cancelamento lógico preserva histórico e libera o slot;
+- estados concluído/cancelado não são reativados;
+- horários passados e janela mínima de antecedência são rejeitados pelo servidor.
+
+### Navegador e transporte
+
+O projeto envia, entre outros:
+
+- `Content-Security-Policy`;
+- `Strict-Transport-Security` (HSTS);
 - `X-Content-Type-Options: nosniff`;
 - `X-Frame-Options: DENY`;
-- `Referrer-Policy` restritiva;
-- `Permissions-Policy` bloqueando câmera, microfone, geolocalização, pagamento e USB;
-- políticas cross-origin para reduzir isolamento indevido entre contextos.
+- `Referrer-Policy: no-referrer`;
+- `Cross-Origin-Opener-Policy`;
+- `Cross-Origin-Resource-Policy`;
+- `Origin-Agent-Cluster`;
+- `Permissions-Policy` restritiva.
 
-## Limites deste case
+A CSP bloqueia objetos, frames externos não autorizados, handlers inline de script e restringe conexões/frames adicionais ao domínio necessário para o Turnstile. O projeto não usa `dangerouslySetInnerHTML` nem `eval`.
 
-Para uma clínica real com dados pessoais de pacientes, ainda seria recomendável adicionar autenticação por usuário individual, MFA, papéis/permissões, trilha de auditoria, política formal de retenção de dados, monitoramento de incidentes, rate limiting no edge e proteção anti-bot (por exemplo Cloudflare Turnstile/WAF).
+## Dependências e supply chain
 
-O projeto demonstrativo não deve receber prontuário médico ou outros dados clínicos sensíveis.
+- dependências críticas são fixadas em versões explícitas;
+- o CI executa lint, TypeScript, testes, build e auditoria de vulnerabilidades de severidade alta;
+- `pnpm-lock.yaml` deve ser versionado e o CI deve usar instalação congelada;
+- atualizações automáticas de dependências são acompanhadas pelo Dependabot.
+
+## Limites deliberados do case
+
+Para uma clínica real, a autenticação por token único deveria ser substituída por uma identidade por funcionário, MFA, RBAC, rotação/revogação de sessão, trilha de auditoria imutável, política formal de retenção/eliminação de PII, observabilidade de segurança e gestão operacional de incidentes.
+
+Esses limites são documentados para não confundir um case demonstrativo com um sistema clínico pronto para processamento de dados de saúde em produção.

@@ -2,6 +2,11 @@ export type ApiErrorCode =
   | "INVALID_DATE"
   | "PAST_DATE"
   | "VALIDATION_ERROR"
+  | "PAYLOAD_TOO_LARGE"
+  | "AUTOMATION_REJECTED"
+  | "TURNSTILE_REQUIRED"
+  | "TURNSTILE_FAILED"
+  | "TURNSTILE_UNAVAILABLE"
   | "INVALID_SLOT"
   | "PAST_SLOT"
   | "BOOKING_TOO_SOON"
@@ -27,8 +32,10 @@ export function jsonError(status: number, code: ApiErrorCode, message: string) {
   );
 }
 
-export function databaseError(error: unknown) {
-  console.error("Database request failed", error);
+export function databaseError(_error: unknown) {
+  // Não serializa nem registra o erro bruto: adapters de banco podem incluir
+  // parâmetros da consulta e, neste domínio, isso pode significar PII.
+  console.error("Database request failed");
   return jsonError(
     503,
     "DATABASE_UNAVAILABLE",

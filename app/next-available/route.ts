@@ -3,6 +3,7 @@ import { and, gte, ne } from "drizzle-orm";
 import { getDb } from "@/db";
 import { appointments } from "@/db/schema";
 import { databaseError, jsonError } from "@/lib/api-response";
+import { enforcePublicReadRateLimit } from "@/lib/booking-rate-limit";
 import { getHolidays, HolidayServiceError } from "@/lib/holiday-service";
 import {
   appointmentSlotKey,
@@ -20,6 +21,9 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const rateLimitError = await enforcePublicReadRateLimit(request, "next-available");
+  if (rateLimitError) return rateLimitError;
+
   const url = new URL(request.url);
   const fromDate = url.searchParams.get("fromDate")?.trim() ?? "";
   const providerId = url.searchParams.get("providerId")?.trim() ?? "all";

@@ -1,10 +1,8 @@
-import { getDb } from "@/db";
-import { adminAuditLog } from "@/db/schema";
 import type { AdminIdentity } from "@/lib/cloudflare-access";
 
 export type AdminAuditAction = "RESCHEDULED" | "COMPLETED" | "CANCELLED";
 
-export async function writeAdminAudit({
+export function buildAdminAuditValues({
   request,
   identity,
   appointmentId,
@@ -20,12 +18,12 @@ export async function writeAdminAudit({
   ).slice(0, 120);
   const actor = (identity?.email || "shared-admin-token").slice(0, 320);
 
-  await getDb().insert(adminAuditLog).values({
+  return {
     id: crypto.randomUUID(),
     appointmentId,
     action,
     actor,
     requestId,
     createdAt: new Date().toISOString(),
-  });
+  } as const;
 }

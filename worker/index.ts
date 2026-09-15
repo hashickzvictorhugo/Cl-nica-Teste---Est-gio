@@ -2,7 +2,7 @@ import handler from "vinext/server/fetch-handler";
 
 import { applySecurityHeaders } from "../lib/security-response";
 
-export default {
+const worker = {
   async fetch(
     request: Request,
     env: Cloudflare.Env,
@@ -12,3 +12,5 @@ export default {
     return applySecurityHeaders(response, new URL(request.url).pathname);
   },
 };
+
+export default worker;

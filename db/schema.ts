@@ -45,6 +45,7 @@ export const adminAuditLog = sqliteTable(
     appointmentId: text("appointment_id").notNull(),
     action: text("action").notNull(),
     actor: text("actor").notNull(),
+    source: text("source").notNull(),
     requestId: text("request_id").notNull(),
     createdAt: text("created_at").notNull(),
   },
@@ -54,6 +55,10 @@ export const adminAuditLog = sqliteTable(
     check(
       "admin_audit_action_check",
       sql`${table.action} IN ('RESCHEDULED', 'COMPLETED', 'CANCELLED')`,
+    ),
+    check(
+      "admin_audit_source_check",
+      sql`${table.source} IN ('DATABASE', 'APPLICATION')`,
     ),
   ],
 );

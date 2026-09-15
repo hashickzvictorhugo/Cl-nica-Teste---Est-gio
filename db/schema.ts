@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { check, index, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const appointments = sqliteTable(
   "appointments",
@@ -34,6 +34,26 @@ export const appointments = sqliteTable(
     check(
       "appointments_status_check",
       sql`${table.status} IN ('CONFIRMED', 'COMPLETED', 'CANCELLED')`,
+    ),
+  ],
+);
+
+export const adminAuditLog = sqliteTable(
+  "admin_audit_log",
+  {
+    id: text("id").primaryKey(),
+    appointmentId: text("appointment_id").notNull(),
+    action: text("action").notNull(),
+    actor: text("actor").notNull(),
+    requestId: text("request_id").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    index("admin_audit_created_at_idx").on(table.createdAt),
+    index("admin_audit_appointment_idx").on(table.appointmentId),
+    check(
+      "admin_audit_action_check",
+      sql`${table.action} IN ('RESCHEDULED', 'COMPLETED', 'CANCELLED')`,
     ),
   ],
 );

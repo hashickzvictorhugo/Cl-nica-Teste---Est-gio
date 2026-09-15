@@ -1,7 +1,7 @@
 import { PROVIDERS } from "./providers.ts";
 import {
   getSchedulingClock,
-  hasSlotStarted,
+  isSlotBookable,
   isWeekend,
   SLOT_STARTS,
   type SlotStart,
@@ -52,7 +52,7 @@ export function findNextAvailableSlot({
   while (date <= endDate) {
     if (!isWeekend(date) && !holidayDates.has(date)) {
       for (const startTime of SLOT_STARTS) {
-        if (hasSlotStarted(date, startTime, now)) continue;
+        if (!isSlotBookable(date, startTime, now)) continue;
         for (const providerId of providerIds) {
           if (!occupiedSlots.has(appointmentSlotKey(providerId, date, startTime))) {
             return { date, providerId, startTime };

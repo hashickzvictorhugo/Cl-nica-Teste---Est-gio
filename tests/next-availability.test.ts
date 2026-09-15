@@ -47,6 +47,22 @@ test("next availability skips slots that already started today", () => {
   });
 });
 
+test("next availability also skips slots inside the minimum lead time", () => {
+  const result = findNextAvailableSlot({
+    fromDate: "2026-09-14",
+    holidayDates: new Set(),
+    occupiedSlots: new Set(),
+    providerIds: ["ana-martins"],
+    now: new Date("2026-09-14T17:31:00.000Z"),
+  });
+
+  assert.deepEqual(result, {
+    date: "2026-09-14",
+    providerId: "ana-martins",
+    startTime: "16:00",
+  });
+});
+
 test("next availability never searches before the current local date", () => {
   const result = findNextAvailableSlot({
     fromDate: "2026-09-10",

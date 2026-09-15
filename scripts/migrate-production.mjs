@@ -115,6 +115,7 @@ if (!hasIndex("appointments_active_patient_date_start_time_unique")) {
 
 if (
   !hasTable("admin_audit_log") ||
+  !hasTrigger("appointments_audit_update") ||
   !hasTrigger("admin_audit_log_no_update") ||
   !hasTrigger("admin_audit_log_no_delete")
 ) {

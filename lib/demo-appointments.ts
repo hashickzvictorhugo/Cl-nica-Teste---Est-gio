@@ -1,6 +1,6 @@
-import type { AppointmentStatus } from "./appointment-status";
-import { getProviderById, type Provider } from "./providers";
-import { TIMEZONE } from "./scheduling";
+import type { AppointmentStatus } from "./appointment-status.ts";
+import { getProviderById, type Provider } from "./providers.ts";
+import { TIMEZONE } from "./scheduling.ts";
 
 export type DemoAdminAppointment = {
   id: string;

@@ -145,7 +145,9 @@ A chave pública é entregue ao frontend por `/security-config`; a chave secreta
 - estados concluído/cancelado não são reativados;
 - horários passados e janela mínima de antecedência são rejeitados pelo servidor;
 - remarcação, conclusão e cancelamento usam atualização condicional por estado para impedir lost updates em operações concorrentes;
-- conflitos detectados pela constraint do banco são convertidos em resposta de conflito, sem expor parâmetros internos.
+- conflitos detectados pela constraint do banco são convertidos em resposta de conflito, sem expor parâmetros internos;
+- alterações operacionais relevantes geram trilha de auditoria append-only, com proteção contra `UPDATE` e `DELETE` no próprio banco;
+- a aplicação registra a identidade individual validada pelo Cloudflare Access quando disponível, enquanto um trigger de banco mantém uma trilha defensiva mesmo fora do fluxo normal da aplicação.
 
 ### Navegador e transporte
 
@@ -169,11 +171,15 @@ A diretiva `unsafe-inline` ainda é necessária em `script-src` para o bootstrap
 ## Dependências e supply chain
 
 - dependências críticas são fixadas em versões explícitas;
-- o CI executa lint, TypeScript, testes, build e auditoria de vulnerabilidades a partir de severidade **moderada**;
+- o CI executa lint, TypeScript, testes e build antes da auditoria de dependências;
+- vulnerabilidades de severidade **moderada ou superior** bloqueiam o CI quando estão na árvore de dependências de produção;
+- vulnerabilidades de severidade **alta ou crítica** bloqueiam o CI em toda a árvore, inclusive ferramentas de desenvolvimento;
 - `pnpm-lock.yaml` é versionado e o CI usa instalação congelada;
 - GitHub Actions usadas pelo pipeline são fixadas por SHA;
 - CodeQL roda em push, pull request e agenda semanal com queries `security-extended`;
 - atualizações automáticas de npm e GitHub Actions são acompanhadas pelo Dependabot.
+
+Existe um advisory moderado conhecido (`GHSA-67mh-4wv8-2f99`) em uma versão antiga de `esbuild` trazida transitivamente por `drizzle-kit` via `@esbuild-kit/esm-loader`. O pacote afetado é uma ferramenta de desenvolvimento usada para geração de migrações e não integra o bundle implantado no Worker. O risco descrito pelo advisory depende do servidor de desenvolvimento do `esbuild`; esse caminho não é exposto pelo Garde Agenda. A exceção permanece documentada e deve ser removida assim que a cadeia upstream abandonar a dependência vulnerável. Essa justificativa não reduz o gate de dependências de produção nem o gate de severidade alta da árvore completa.
 
 ## Controles operacionais recomendados para uso clínico real
 

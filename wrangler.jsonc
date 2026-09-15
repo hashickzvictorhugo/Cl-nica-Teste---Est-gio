@@ -19,6 +19,22 @@
         "limit": 8,
         "period": 60
       }
+    },
+    {
+      "name": "PUBLIC_READ_RATE_LIMITER",
+      "namespace_id": "583215",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    },
+    {
+      "name": "ADMIN_RATE_LIMITER",
+      "namespace_id": "583216",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
     }
   ]
 }

@@ -1,5 +1,7 @@
 import { env } from "cloudflare:workers";
 
+import { enforceAdminAttemptRateLimit } from "@/lib/booking-rate-limit";
+
 const encoder = new TextEncoder();
 
 async function digest(value: string) {
@@ -34,6 +36,11 @@ function unauthorized(message = "Autenticação administrativa necessária.") {
   );
 }
 
+async function rejectedAttempt(request: Request, message?: string) {
+  const rateLimitError = await enforceAdminAttemptRateLimit(request);
+  return rateLimitError ?? unauthorized(message);
+}
+
 export async function requireAdmin(request: Request): Promise<Response | null> {
   const configuredToken = env.ADMIN_TOKEN?.trim();
   if (!configuredToken) {
@@ -49,11 +56,11 @@ export async function requireAdmin(request: Request): Promise<Response | null> {
   }
 
   const authorization = request.headers.get("Authorization")?.trim() ?? "";
-  if (!authorization.startsWith("Bearer ")) return unauthorized();
+  if (!authorization.startsWith("Bearer ")) return rejectedAttempt(request);
 
   const suppliedToken = authorization.slice("Bearer ".length).trim();
   if (!suppliedToken || !(await constantTimeEqual(suppliedToken, configuredToken))) {
-    return unauthorized("Credencial administrativa inválida.");
+    return rejectedAttempt(request, "Credencial administrativa inválida.");
   }
 
   return null;

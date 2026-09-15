@@ -179,6 +179,7 @@ test("admin audit log is append-only", () => {
     action: string;
     actor: string;
   };
-  assert.deepEqual(row, { action: "CANCELLED", actor: "admin@example.test" });
+  assert.equal(row.action, "CANCELLED");
+  assert.equal(row.actor, "admin@example.test");
   db.close();
 });

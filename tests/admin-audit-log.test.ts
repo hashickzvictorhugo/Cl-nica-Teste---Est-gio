@@ -41,12 +41,10 @@ test("mudança de status gera auditoria automática e imutável", () => {
       request_id: string;
     };
 
-  assert.deepEqual(row, {
-    action: "CANCELLED",
-    actor: "database-enforced",
-    source: "DATABASE",
-    request_id: "database-trigger",
-  });
+  assert.equal(row.action, "CANCELLED");
+  assert.equal(row.actor, "database-enforced");
+  assert.equal(row.source, "DATABASE");
+  assert.equal(row.request_id, "database-trigger");
 
   assert.throws(
     () => db.prepare("UPDATE admin_audit_log SET actor = 'other'").run(),
@@ -75,6 +73,7 @@ test("auditoria de aplicação aceita identidade sem permitir alteração poster
 
   const row = db.prepare("SELECT actor, source FROM admin_audit_log WHERE id = ?")
     .get("audit-app") as { actor: string; source: string };
-  assert.deepEqual(row, { actor: "admin@example.test", source: "APPLICATION" });
+  assert.equal(row.actor, "admin@example.test");
+  assert.equal(row.source, "APPLICATION");
   db.close();
 });

@@ -2,13 +2,18 @@ import { and, asc, eq, like, ne, or } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { appointments } from "@/db/schema";
-import { requireAdmin, isAdminScope } from "@/lib/admin-auth";
+import {
+  authorizeAdmin,
+  isAdminScope,
+  requireFullAdmin,
+} from "@/lib/admin-auth";
 import {
   isAppointmentStatus,
   type AppointmentStatus,
 } from "@/lib/appointment-status";
 import { databaseError, jsonError } from "@/lib/api-response";
 import { enforceBookingRateLimit } from "@/lib/booking-rate-limit";
+import { filterDemoAppointments } from "@/lib/demo-appointments";
 import {
   getHolidayForDate,
   HolidayServiceError,
@@ -147,8 +152,8 @@ export async function GET(request: Request) {
     );
   }
 
-  const authError = await requireAdmin(request);
-  if (authError) return authError;
+  const authorization = await authorizeAdmin(request);
+  if (authorization.error) return authorization.error;
 
   const url = new URL(request.url);
   const date = url.searchParams.get("date")?.trim() ?? "";
@@ -164,6 +169,20 @@ export async function GET(request: Request) {
   }
   if (status && status !== "all" && !isAppointmentStatus(status)) {
     return jsonError(400, "INVALID_STATUS", "Escolha um status válido para filtrar a agenda.");
+  }
+
+  if (authorization.access === "demo") {
+    const demoRows = filterDemoAppointments({ date, providerId, status, search });
+    return Response.json(
+      {
+        appointments: demoRows,
+        count: demoRows.length,
+        protected: true,
+        access: "demo",
+        demo: true,
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const conditions = [];
@@ -189,7 +208,13 @@ export async function GET(request: Request) {
       .limit(200);
 
     return Response.json(
-      { appointments: rows.map(presentAdminAppointment), count: rows.length, protected: true },
+      {
+        appointments: rows.map(presentAdminAppointment),
+        count: rows.length,
+        protected: true,
+        access: "full",
+        demo: false,
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
@@ -292,7 +317,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const authError = await requireAdmin(request);
+  const authError = await requireFullAdmin(request);
   if (authError) return authError;
 
   let payload: Record<string, unknown>;
@@ -413,7 +438,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const authError = await requireAdmin(request);
+  const authError = await requireFullAdmin(request);
   if (authError) return authError;
 
   const id = new URL(request.url).searchParams.get("id")?.trim();

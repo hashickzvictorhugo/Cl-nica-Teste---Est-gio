@@ -16,9 +16,9 @@ Pode apenas:
 
 `GET /appointments` sem escopo administrativo não entrega nomes, telefones ou histórico. A confirmação pública de um novo agendamento também retorna apenas o mínimo necessário: protocolo, data, horário, profissional e status.
 
-### Área administrativa
+### Área administrativa completa
 
-`/admin` permite consultar nome/telefone, histórico e executar ações operacionais. A API exige:
+`/admin` permite consultar nome/telefone, histórico e executar ações operacionais. A API aceita a credencial completa via:
 
 ```text
 Authorization: Bearer <ADMIN_TOKEN>
@@ -26,17 +26,37 @@ Authorization: Bearer <ADMIN_TOKEN>
 
 O `ADMIN_TOKEN` é um secret do Cloudflare Worker e nunca deve ser colocado no GitHub, no JavaScript público ou em arquivos `.env` versionados.
 
+### Acesso de demonstração para avaliação
+
+Uma segunda credencial opcional, `DEMO_ADMIN_TOKEN`, permite que um avaliador abra o mesmo painel sem receber acesso aos registros operacionais do D1.
+
+Quando a credencial demo é usada:
+
+- `GET /appointments?scope=admin` retorna somente um dataset estático e explicitamente fictício;
+- nenhum registro real do banco é retornado;
+- `PATCH` e `DELETE` são bloqueados no backend com `403 ADMIN_READ_ONLY`;
+- concluir, cancelar e contato via WhatsApp ficam indisponíveis no painel;
+- o frontend deixa visível que a sessão está em **modo demonstração — somente leitura**.
+
+A separação é imposta no servidor. Desabilitar os botões no frontend é apenas uma camada adicional de UX, não o controle de autorização principal.
+
 A credencial digitada no painel fica somente na memória do componente. Ela é descartada ao sair/recarregar a página, ao restaurar a página pelo histórico/bfcache e após 15 minutos de inatividade.
 
 ## Configuração do acesso administrativo
 
-No Windows/PowerShell:
+No Windows/PowerShell, para o administrador real:
 
 ```powershell
 pnpm.cmd exec wrangler secret put ADMIN_TOKEN
 ```
 
-Use uma credencial longa, exclusiva e aleatória. Em seguida, publique pelo fluxo de release, que também verifica as migrações do D1:
+Para habilitar o acesso demonstrativo somente leitura:
+
+```powershell
+pnpm.cmd exec wrangler secret put DEMO_ADMIN_TOKEN
+```
+
+Use credenciais longas, exclusivas e aleatórias, e mantenha `ADMIN_TOKEN` e `DEMO_ADMIN_TOKEN` diferentes. Em seguida, publique pelo fluxo de release, que também verifica as migrações do D1:
 
 ```powershell
 pnpm.cmd run release
@@ -46,9 +66,12 @@ pnpm.cmd run release
 
 ### Autenticação e autorização
 
-- autenticação server-side para listagem de PII e ações administrativas;
-- falha fechada quando `ADMIN_TOKEN` não está configurado;
-- comparação do token por digest SHA-256 e comparação byte a byte;
+- autenticação server-side para listagem protegida e ações administrativas;
+- níveis separados de acesso `full` e `demo`;
+- credencial demo isolada dos dados reais do D1;
+- mutações administrativas aceitas apenas no nível `full`;
+- falha fechada quando nenhuma credencial administrativa está configurada;
+- comparação das credenciais por digest SHA-256 e comparação byte a byte;
 - limitação de tentativas administrativas por origem;
 - sessão administrativa somente em memória, com expiração por inatividade;
 - `/admin` marcado como `noindex, nofollow`.
@@ -56,6 +79,8 @@ pnpm.cmd run release
 ### Privacidade
 
 - a área pública não lista registros de pacientes;
+- o modo demo não lista registros operacionais reais;
+- o dataset demo usa apenas nomes e telefones fictícios identificados como demonstração;
 - respostas públicas de criação são minimizadas e não repetem nome/telefone;
 - respostas administrativas e sensíveis usam `Cache-Control: no-store`;
 - nenhum segredo é armazenado no código-fonte;
@@ -115,6 +140,6 @@ A CSP bloqueia objetos, frames externos não autorizados, handlers inline de scr
 
 ## Limites deliberados do case
 
-Para uma clínica real, a autenticação por token único deveria ser substituída por uma identidade por funcionário, MFA, RBAC, rotação/revogação de sessão, trilha de auditoria imutável, política formal de retenção/eliminação de PII, observabilidade de segurança e gestão operacional de incidentes.
+Para uma clínica real, a autenticação por tokens compartilhados deveria ser substituída por identidade individual por funcionário, MFA, RBAC, rotação/revogação de sessão, trilha de auditoria imutável, política formal de retenção/eliminação de PII, observabilidade de segurança e gestão operacional de incidentes.
 
 Esses limites são documentados para não confundir um case demonstrativo com um sistema clínico pronto para processamento de dados de saúde em produção.

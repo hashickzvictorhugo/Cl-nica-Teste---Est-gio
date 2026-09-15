@@ -1,9 +1,12 @@
 import { env } from "cloudflare:workers";
 
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+export const TURNSTILE_ACTION = "book_appointment";
 
 type TurnstileResponse = {
   success?: boolean;
+  hostname?: string;
+  action?: string;
   "error-codes"?: string[];
 };
 
@@ -15,21 +18,30 @@ export function getTurnstileSiteKey() {
   return turnstileEnabled() ? env.TURNSTILE_SITE_KEY!.trim() : "";
 }
 
+function turnstileError(status: number, code: string, message: string) {
+  return Response.json(
+    { error: { code, message } },
+    { status, headers: { "Cache-Control": "no-store" } },
+  );
+}
+
 export async function verifyTurnstile(
   request: Request,
   token: unknown,
 ): Promise<Response | null> {
-  if (!turnstileEnabled()) return null;
+  if (!turnstileEnabled()) {
+    return turnstileError(
+      503,
+      "TURNSTILE_UNAVAILABLE",
+      "A proteção anti-bot não está configurada. O agendamento foi bloqueado preventivamente.",
+    );
+  }
 
   if (typeof token !== "string" || !token.trim()) {
-    return Response.json(
-      {
-        error: {
-          code: "TURNSTILE_REQUIRED",
-          message: "Confirme a verificação de segurança antes de agendar.",
-        },
-      },
-      { status: 400, headers: { "Cache-Control": "no-store" } },
+    return turnstileError(
+      400,
+      "TURNSTILE_REQUIRED",
+      "Confirme a verificação de segurança antes de agendar.",
     );
   }
 
@@ -48,26 +60,29 @@ export async function verifyTurnstile(
     if (!response.ok) throw new Error("Turnstile verify endpoint unavailable");
 
     const result = (await response.json()) as TurnstileResponse;
-    if (result.success) return null;
+    if (!result.success) {
+      return turnstileError(
+        400,
+        "TURNSTILE_FAILED",
+        "A verificação de segurança não foi validada. Atualize o desafio e tente novamente.",
+      );
+    }
 
-    return Response.json(
-      {
-        error: {
-          code: "TURNSTILE_FAILED",
-          message: "A verificação de segurança não foi validada. Atualize o desafio e tente novamente.",
-        },
-      },
-      { status: 400, headers: { "Cache-Control": "no-store" } },
-    );
+    const expectedHostname = new URL(request.url).hostname.toLowerCase();
+    if (result.hostname?.toLowerCase() !== expectedHostname || result.action !== TURNSTILE_ACTION) {
+      return turnstileError(
+        400,
+        "TURNSTILE_FAILED",
+        "A verificação de segurança não corresponde a esta sessão de agendamento.",
+      );
+    }
+
+    return null;
   } catch {
-    return Response.json(
-      {
-        error: {
-          code: "TURNSTILE_UNAVAILABLE",
-          message: "A verificação anti-bot está indisponível no momento. Tente novamente em instantes.",
-        },
-      },
-      { status: 503, headers: { "Cache-Control": "no-store" } },
+    return turnstileError(
+      503,
+      "TURNSTILE_UNAVAILABLE",
+      "A verificação anti-bot está indisponível no momento. Tente novamente em instantes.",
     );
   }
 }

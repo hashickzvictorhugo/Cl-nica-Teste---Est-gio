@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { TurnstileWidget } from "@/app/components/TurnstileWidget";
+import type { SymptomDuration, VisitType } from "@/lib/pre-attendance";
 import { DEFAULT_PROVIDER_ID, PROVIDERS, type Provider } from "@/lib/providers";
 
 type SlotUnavailableReason = "BLOCKED" | "OCCUPIED" | "TOO_SOON" | null;
@@ -123,6 +124,12 @@ export function SchedulingApp() {
   const [slot, setSlot] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [visitReason, setVisitReason] = useState("");
+  const [symptomDuration, setSymptomDuration] = useState<SymptomDuration | "">("");
+  const [visitType, setVisitType] = useState<VisitType | "">("");
+  const [patientNotes, setPatientNotes] = useState("");
+  const [preAttendanceComplete, setPreAttendanceComplete] = useState(false);
+  const [preAttendanceError, setPreAttendanceError] = useState("");
   const [website, setWebsite] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
@@ -224,6 +231,41 @@ export function SchedulingApp() {
     };
   }, [availabilityByProvider, pendingSuggestion]);
 
+  function continuePreAttendance() {
+    const normalizedName = name.trim().replace(/\s+/g, " ");
+    const phoneDigits = phone.replace(/\D/g, "");
+    const normalizedReason = visitReason.trim().replace(/\s+/g, " ");
+    const normalizedNotes = patientNotes.trim().replace(/\s+/g, " ");
+
+    if (normalizedName.length < 2 || normalizedName.length > 80) {
+      setPreAttendanceError("Informe o nome completo com 2 a 80 caracteres.");
+      return;
+    }
+    if (phoneDigits.length < 8 || phoneDigits.length > 13) {
+      setPreAttendanceError("Informe um telefone / WhatsApp válido com 8 a 13 dígitos.");
+      return;
+    }
+    if (normalizedReason.length < 5 || normalizedReason.length > 300) {
+      setPreAttendanceError("Descreva o motivo da consulta com 5 a 300 caracteres.");
+      return;
+    }
+    if (!visitType) {
+      setPreAttendanceError("Informe se esta é a primeira consulta ou um retorno.");
+      return;
+    }
+    if (normalizedNotes.length > 500) {
+      setPreAttendanceError("As observações adicionais devem ter no máximo 500 caracteres.");
+      return;
+    }
+
+    setName(normalizedName);
+    setVisitReason(normalizedReason);
+    setPatientNotes(normalizedNotes);
+    setPreAttendanceError("");
+    setPreAttendanceComplete(true);
+    showToast("info", "Pré-atendimento salvo. Agora escolha profissional, data e horário.");
+  }
+
   async function findNextAvailability() {
     setFindingNext(true);
     setFormError("");
@@ -254,7 +296,7 @@ export function SchedulingApp() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!slot || name.trim().length < 2) return;
+    if (!preAttendanceComplete || !slot || name.trim().length < 2) return;
     setSaving(true);
     setFormError("");
     try {
@@ -267,12 +309,22 @@ export function SchedulingApp() {
           providerId,
           patientName: name,
           patientPhone: phone,
+          visitReason,
+          symptomDuration,
+          visitType,
+          patientNotes,
           website,
           turnstileToken,
         }),
       });
       setName("");
       setPhone("");
+      setVisitReason("");
+      setSymptomDuration("");
+      setVisitType("");
+      setPatientNotes("");
+      setPreAttendanceComplete(false);
+      setPreAttendanceError("");
       setWebsite("");
       setSlot("");
       showToast(
@@ -332,207 +384,324 @@ export function SchedulingApp() {
         <form className="booking-card" onSubmit={submit}>
           <div className="card-kicker">AGENDAMENTO INTELIGENTE</div>
 
-          <div className="smart-finder">
-            <div>
-              <small>ATALHO INTELIGENTE</small>
-              <strong>Quer ser atendido o quanto antes?</strong>
-              <span>O sistema procura automaticamente o primeiro médico e horário disponíveis a partir da data escolhida.</span>
-            </div>
-            <button
-              className="smart-find-button"
-              disabled={findingNext || availabilityLoading}
-              onClick={() => void findNextAvailability()}
-              type="button"
-            >
-              {findingNext ? "Procurando…" : "Encontrar próximo horário"}
-            </button>
-          </div>
+          {!preAttendanceComplete ? (
+            <section className="pre-attendance" aria-labelledby="pre-attendance-title">
+              <div className="section-heading pre-attendance-heading">
+                <span>1</span>
+                <div>
+                  <h2 id="pre-attendance-title">Pré-atendimento</h2>
+                  <p>Conte brevemente o que motivou a consulta antes de escolher o horário.</p>
+                </div>
+              </div>
 
-          <div className="section-heading">
-            <span>1</span>
-            <div><h2>Escolha quem vai atender</h2><p>Cada profissional possui uma agenda independente.</p></div>
-          </div>
-          <div className="provider-grid" role="radiogroup" aria-label="Profissionais disponíveis">
-            {PROVIDERS.map((provider) => {
-              const selected = provider.id === providerId;
-              const providerAvailability = availabilityByProvider[provider.id];
-              const providerCount = providerAvailability?.date === date
-                ? providerAvailability.availableCount
-                : null;
-              return (
+              <div className="pre-attendance-grid">
+                <label className="pre-attendance-field" htmlFor="patient-name">
+                  <span>Nome completo</span>
+                  <input
+                    autoComplete="name"
+                    id="patient-name"
+                    maxLength={80}
+                    minLength={2}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Ex.: Maria Silva"
+                    required
+                    value={name}
+                  />
+                </label>
+
+                <label className="pre-attendance-field" htmlFor="patient-phone">
+                  <span>Telefone / WhatsApp</span>
+                  <input
+                    autoComplete="tel"
+                    id="patient-phone"
+                    inputMode="tel"
+                    maxLength={20}
+                    onChange={(event) => setPhone(event.target.value)}
+                    placeholder="Ex.: (18) 99999-9999"
+                    required
+                    type="tel"
+                    value={phone}
+                  />
+                </label>
+
+                <label className="pre-attendance-field full" htmlFor="visit-reason">
+                  <span>Motivo da consulta / o que está sentindo</span>
+                  <textarea
+                    id="visit-reason"
+                    maxLength={300}
+                    minLength={5}
+                    onChange={(event) => setVisitReason(event.target.value)}
+                    placeholder="Ex.: Estou com dor de cabeça há alguns dias e gostaria de uma avaliação."
+                    required
+                    rows={4}
+                    value={visitReason}
+                  />
+                  <small>{visitReason.length}/300</small>
+                </label>
+
+                <label className="pre-attendance-field" htmlFor="symptom-duration">
+                  <span>Há quanto tempo?</span>
+                  <select
+                    id="symptom-duration"
+                    onChange={(event) => setSymptomDuration(event.target.value as SymptomDuration | "")}
+                    value={symptomDuration}
+                  >
+                    <option value="">Prefiro não informar / não sei</option>
+                    <option value="TODAY">Hoje</option>
+                    <option value="FEW_DAYS">Alguns dias</option>
+                    <option value="WEEKS">Algumas semanas</option>
+                    <option value="MONTHS">Alguns meses</option>
+                    <option value="NOT_APPLICABLE">Não se aplica</option>
+                  </select>
+                </label>
+
+                <label className="pre-attendance-field" htmlFor="visit-type">
+                  <span>Tipo de consulta</span>
+                  <select
+                    id="visit-type"
+                    onChange={(event) => setVisitType(event.target.value as VisitType | "")}
+                    required
+                    value={visitType}
+                  >
+                    <option value="">Selecione</option>
+                    <option value="FIRST_VISIT">Primeira consulta</option>
+                    <option value="RETURN">Retorno</option>
+                  </select>
+                </label>
+
+                <label className="pre-attendance-field full" htmlFor="patient-notes">
+                  <span>Observações adicionais <em>opcional</em></span>
+                  <textarea
+                    id="patient-notes"
+                    maxLength={500}
+                    onChange={(event) => setPatientNotes(event.target.value)}
+                    placeholder="Algo que ajude a equipe a organizar seu atendimento. Evite inserir informações desnecessárias."
+                    rows={3}
+                    value={patientNotes}
+                  />
+                  <small>{patientNotes.length}/500</small>
+                </label>
+              </div>
+
+              <div className="pre-attendance-notices">
+                <p>
+                  <strong>Informação importante.</strong> As informações acima servem apenas para organizar o atendimento e não substituem avaliação médica.
+                </p>
+                <p className="urgent">
+                  <strong>Emergência.</strong> Em caso de sintomas graves, emergência ou risco imediato à saúde, procure um serviço de urgência.
+                </p>
+              </div>
+
+              {preAttendanceError ? <div className="error" role="alert">{preAttendanceError}</div> : null}
+
+              <button className="pre-attendance-continue" onClick={continuePreAttendance} type="button">
+                Continuar para escolher o horário
+              </button>
+            </section>
+          ) : (
+            <>
+              <div className="pre-attendance-summary" role="status">
+                <div>
+                  <small>PRÉ-ATENDIMENTO PREENCHIDO</small>
+                  <strong>{name}</strong>
+                  <span>{visitType === "RETURN" ? "Retorno" : "Primeira consulta"} · dados salvos apenas para este agendamento</span>
+                </div>
+                <button onClick={() => setPreAttendanceComplete(false)} type="button">Editar dados</button>
+              </div>
+
+              <div className="smart-finder">
+                <div>
+                  <small>ATALHO INTELIGENTE</small>
+                  <strong>Quer ser atendido o quanto antes?</strong>
+                  <span>O sistema procura automaticamente o primeiro médico e horário disponíveis a partir da data escolhida.</span>
+                </div>
                 <button
-                  aria-checked={selected}
-                  className={selected ? "provider-card selected" : "provider-card"}
-                  key={provider.id}
-                  onClick={() => {
-                    setProviderId(provider.id);
-                    setSlot("");
-                  }}
-                  role="radio"
+                  className="smart-find-button"
+                  disabled={findingNext || availabilityLoading}
+                  onClick={() => void findNextAvailability()}
                   type="button"
                 >
-                  <span className="provider-avatar">{provider.initials}</span>
-                  <span className="provider-copy">
-                    <strong>{provider.name}</strong>
-                    <span>{provider.specialty}</span>
-                    <small>{provider.description}</small>
-                    <em className={providerCount === 0 ? "provider-count unavailable" : "provider-count"}>
-                      {availabilityLoading
-                        ? "Consultando agenda…"
-                        : providerCount === null
-                          ? "Agenda indisponível"
-                          : providerCount === 0
-                            ? "Sem horários nesta data"
-                            : `${providerCount} ${providerCount === 1 ? "horário livre" : "horários livres"}`}
-                    </em>
-                  </span>
-                  <span className="provider-check" aria-hidden="true">✓</span>
+                  {findingNext ? "Procurando…" : "Encontrar próximo horário"}
                 </button>
-              );
-            })}
-          </div>
+              </div>
 
-          <div className="divider" />
-          <div className="section-heading">
-            <span>2</span>
-            <div><h2>Escolha a data</h2><p>Atendimento em dias úteis de 2026.</p></div>
-          </div>
-          <input
-            aria-label="Data da consulta"
-            className="date-input"
-            type="date"
-            min={minimumDate}
-            max="2026-12-31"
-            value={date}
-            onChange={(event) => {
-              setDate(event.target.value);
-              setSlot("");
-            }}
-          />
-          <div className="date-meta" aria-live="polite">
-            <span className="meta-pill">{availability?.weekday ?? "Consultando data…"}</span>
-            <span className="meta-pill">
-              {availability?.timezone ?? "America/Sao_Paulo"} · Brasília
-            </span>
-            <span className={blocked ? "meta-pill blocked" : "meta-pill ok"}>{dayStatus}</span>
-          </div>
+              <div className="section-heading">
+                <span>2</span>
+                <div><h2>Escolha quem vai atender</h2><p>Cada profissional possui uma agenda independente.</p></div>
+              </div>
+              <div className="provider-grid" role="radiogroup" aria-label="Profissionais disponíveis">
+                {PROVIDERS.map((provider) => {
+                  const selected = provider.id === providerId;
+                  const providerAvailability = availabilityByProvider[provider.id];
+                  const providerCount = providerAvailability?.date === date
+                    ? providerAvailability.availableCount
+                    : null;
+                  return (
+                    <button
+                      aria-checked={selected}
+                      className={selected ? "provider-card selected" : "provider-card"}
+                      key={provider.id}
+                      onClick={() => {
+                        setProviderId(provider.id);
+                        setSlot("");
+                      }}
+                      role="radio"
+                      type="button"
+                    >
+                      <span className="provider-avatar">{provider.initials}</span>
+                      <span className="provider-copy">
+                        <strong>{provider.name}</strong>
+                        <span>{provider.specialty}</span>
+                        <small>{provider.description}</small>
+                        <em className={providerCount === 0 ? "provider-count unavailable" : "provider-count"}>
+                          {availabilityLoading
+                            ? "Consultando agenda…"
+                            : providerCount === null
+                              ? "Agenda indisponível"
+                              : providerCount === 0
+                                ? "Sem horários nesta data"
+                                : `${providerCount} ${providerCount === 1 ? "horário livre" : "horários livres"}`}
+                        </em>
+                      </span>
+                      <span className="provider-check" aria-hidden="true">✓</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-          <div className="selected-provider-strip">
-            <span className="provider-avatar">{selectedProvider.initials}</span>
-            <div>
-              <strong>{selectedProvider.name}</strong>
-              <span>{selectedProvider.specialty} · agenda das 08h às 18h · {availableSlots} livres nesta data</span>
-            </div>
-          </div>
+              <div className="divider" />
+              <div className="section-heading">
+                <span>3</span>
+                <div><h2>Escolha a data</h2><p>Atendimento em dias úteis de 2026.</p></div>
+              </div>
+              <input
+                aria-label="Data da consulta"
+                className="date-input"
+                type="date"
+                min={minimumDate}
+                max="2026-12-31"
+                value={date}
+                onChange={(event) => {
+                  setDate(event.target.value);
+                  setSlot("");
+                }}
+              />
+              <div className="date-meta" aria-live="polite">
+                <span className="meta-pill">{availability?.weekday ?? "Consultando data…"}</span>
+                <span className="meta-pill">
+                  {availability?.timezone ?? "America/Sao_Paulo"} · Brasília
+                </span>
+                <span className={blocked ? "meta-pill blocked" : "meta-pill ok"}>{dayStatus}</span>
+              </div>
 
-          <div className="divider" />
-          <div className="section-heading">
-            <span>3</span>
-            <div><h2>Veja a disponibilidade</h2><p>Horários de uma hora, das 08h às 18h.</p></div>
-          </div>
+              <div className="selected-provider-strip">
+                <span className="provider-avatar">{selectedProvider.initials}</span>
+                <div>
+                  <strong>{selectedProvider.name}</strong>
+                  <span>{selectedProvider.specialty} · agenda das 08h às 18h · {availableSlots} livres nesta data</span>
+                </div>
+              </div>
 
-          {availabilityLoading ? (
-            <div className="slot-skeleton-grid" aria-label="Carregando horários">
-              {Array.from({ length: 10 }, (_, index) => <span className="skeleton slot-skeleton" key={index} />)}
-            </div>
-          ) : null}
-          {!availabilityLoading && blocked ? (
-            <div className="notice">
-              {blocked === "WEEKEND"
-                ? "A clínica não atende aos fins de semana. Use o atalho inteligente para encontrar o próximo dia disponível."
-                : `Não há atendimento neste feriado${availability?.holiday?.localName ? `: ${availability.holiday.localName}` : ""}.`}
-            </div>
-          ) : null}
-          {!availabilityLoading && availability?.isBusinessDay ? (
-            <div className="slots">
-              {availability.slots.map((item) => (
-                <button
-                  aria-label={`${item.startTime} - ${slotLabel(item)}`}
-                  aria-pressed={slot === item.startTime}
-                  className={slot === item.startTime ? "slot selected" : "slot"}
-                  disabled={!item.available}
-                  key={item.startTime}
-                  onClick={() => setSlot(item.startTime)}
-                  type="button"
-                >
-                  <strong>{item.startTime}</strong>
-                  <small>{slotLabel(item)}</small>
-                </button>
-              ))}
-            </div>
-          ) : null}
+              <div className="divider" />
+              <div className="section-heading">
+                <span>4</span>
+                <div><h2>Veja a disponibilidade</h2><p>Horários de uma hora, das 08h às 18h.</p></div>
+              </div>
 
-          <div className="divider" />
-          <div className="section-heading">
-            <span>4</span>
-            <div><h2>Identifique o paciente</h2><p>Nome e contato para concluir o agendamento.</p></div>
-          </div>
-          <label className="field-label" htmlFor="patient-name">Nome do paciente</label>
-          <input
-            autoComplete="name"
-            className="name-input"
-            id="patient-name"
-            maxLength={80}
-            minLength={2}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Ex.: Maria Silva"
-            required
-            value={name}
-          />
+              {availabilityLoading ? (
+                <div className="slot-skeleton-grid" aria-label="Carregando horários">
+                  {Array.from({ length: 10 }, (_, index) => <span className="skeleton slot-skeleton" key={index} />)}
+                </div>
+              ) : null}
+              {!availabilityLoading && blocked ? (
+                <div className="notice">
+                  {blocked === "WEEKEND"
+                    ? "A clínica não atende aos fins de semana. Use o atalho inteligente para encontrar o próximo dia disponível."
+                    : `Não há atendimento neste feriado${availability?.holiday?.localName ? `: ${availability.holiday.localName}` : ""}.`}
+                </div>
+              ) : null}
+              {!availabilityLoading && availability?.isBusinessDay ? (
+                <div className="slots">
+                  {availability.slots.map((item) => (
+                    <button
+                      aria-label={`${item.startTime} - ${slotLabel(item)}`}
+                      aria-pressed={slot === item.startTime}
+                      className={slot === item.startTime ? "slot selected" : "slot"}
+                      disabled={!item.available}
+                      key={item.startTime}
+                      onClick={() => setSlot(item.startTime)}
+                      type="button"
+                    >
+                      <strong>{item.startTime}</strong>
+                      <small>{slotLabel(item)}</small>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
 
-          <label className="field-label" htmlFor="patient-phone">Telefone / WhatsApp <span className="optional">opcional</span></label>
-          <input
-            autoComplete="tel"
-            className="phone-input"
-            id="patient-phone"
-            inputMode="tel"
-            maxLength={20}
-            onChange={(event) => setPhone(event.target.value)}
-            placeholder="Ex.: (18) 99999-9999"
-            type="tel"
-            value={phone}
-          />
+              <div className="divider" />
+              <div className="section-heading">
+                <span>5</span>
+                <div><h2>Revise e confirme</h2><p>Se precisar alterar seus dados, volte ao pré-atendimento antes de confirmar.</p></div>
+              </div>
 
-          <div aria-hidden="true" style={{ position: "absolute", left: "-10000px", width: 1, height: 1, overflow: "hidden" }}>
-            <label htmlFor="company-website">Website</label>
-            <input
-              autoComplete="off"
-              id="company-website"
-              onChange={(event) => setWebsite(event.target.value)}
-              tabIndex={-1}
-              type="text"
-              value={website}
-            />
-          </div>
+              <div className="booking-review">
+                <div><small>Paciente</small><strong>{name}</strong></div>
+                <div><small>Contato</small><strong>{phone}</strong></div>
+                <div><small>Profissional</small><strong>{selectedProvider.name}</strong></div>
+                <div><small>Horário</small><strong>{slot ? `${formatDate(date)} · ${slot}` : "Selecione um horário"}</strong></div>
+              </div>
 
-          <TurnstileWidget onToken={setTurnstileToken} resetKey={turnstileResetKey} />
+              <div aria-hidden="true" style={{ position: "absolute", left: "-10000px", width: 1, height: 1, overflow: "hidden" }}>
+                <label htmlFor="company-website">Website</label>
+                <input
+                  autoComplete="off"
+                  id="company-website"
+                  onChange={(event) => setWebsite(event.target.value)}
+                  tabIndex={-1}
+                  type="text"
+                  value={website}
+                />
+              </div>
 
-          {formError ? <div className="error" role="alert">{formError}</div> : null}
+              <TurnstileWidget onToken={setTurnstileToken} resetKey={turnstileResetKey} />
 
-          <button
-            className="submit"
-            disabled={!slot || name.trim().length < 2 || saving}
-            type="submit"
-          >
-            {saving ? "Confirmando…" : `Confirmar com ${selectedProvider.name}`}
-          </button>
+              {formError ? <div className="error" role="alert">{formError}</div> : null}
+
+              <button
+                className="submit"
+                disabled={!slot || saving}
+                type="submit"
+              >
+                {saving ? "Confirmando…" : `Confirmar com ${selectedProvider.name}`}
+              </button>
+            </>
+          )}
         </form>
 
         <aside className="side-card" aria-label="Resumo e regras do agendamento">
           <div className="side-eyebrow">SEU AGENDAMENTO</div>
           <div className="side-title">
-            <div><h2>Resumo da escolha</h2><p>Somente disponibilidade pública</p></div>
-            <strong>{availableSlots}</strong>
+            <div><h2>{preAttendanceComplete ? "Resumo da escolha" : "Antes de escolher"}</h2><p>{preAttendanceComplete ? "Somente disponibilidade pública" : "Preencha a prévia do atendimento"}</p></div>
+            <strong>{preAttendanceComplete ? availableSlots : "1"}</strong>
           </div>
 
-          <div className="provider-summary">
-            <small>PROFISSIONAL SELECIONADO</small>
-            <strong>{selectedProvider.name}</strong>
-            <span>{selectedProvider.specialty} · {formatDate(date)}</span>
-          </div>
+          {preAttendanceComplete ? (
+            <div className="provider-summary">
+              <small>PROFISSIONAL SELECIONADO</small>
+              <strong>{selectedProvider.name}</strong>
+              <span>{selectedProvider.specialty} · {formatDate(date)}</span>
+            </div>
+          ) : (
+            <div className="provider-summary">
+              <small>ETAPA ATUAL</small>
+              <strong>Pré-atendimento</strong>
+              <span>Uma prévia curta para organizar o atendimento.</span>
+            </div>
+          )}
 
           <div className="metrics metrics-four" aria-label="Políticas do agendamento">
-            <div><strong>{availableSlots}</strong><span>horários livres</span></div>
+            <div><strong>{preAttendanceComplete ? availableSlots : "—"}</strong><span>horários livres</span></div>
             <div><strong>{minimumLead}m</strong><span>antecedência</span></div>
             <div><strong>1h</strong><span>duração</span></div>
             <div><strong>SP</strong><span>fuso horário</span></div>
@@ -540,7 +709,12 @@ export function SchedulingApp() {
 
           <div className="system-card">
             <div><span className="status-dot" /><strong>Privacidade por padrão</strong></div>
-            <p>A área pública nunca lista nomes, telefones ou histórico de outros pacientes. A operação da clínica fica em uma área administrativa separada e autenticada.</p>
+            <p>A área pública nunca lista nomes, telefones, motivo da consulta ou histórico de outros pacientes. A operação fica em uma área administrativa separada e autenticada.</p>
+          </div>
+
+          <div className="system-card">
+            <div><span className="status-dot" /><strong>Sem diagnóstico automático</strong></div>
+            <p>A prévia serve somente para organizar o atendimento. O sistema não diagnostica, classifica risco nem recomenda tratamento.</p>
           </div>
 
           <div className="system-card">

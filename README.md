@@ -2,97 +2,73 @@
 
 [![CI](https://github.com/hashickzvictorhugo/Cl-nica-Teste---Est-gio/actions/workflows/ci.yml/badge.svg)](https://github.com/hashickzvictorhugo/Cl-nica-Teste---Est-gio/actions/workflows/ci.yml)
 
-Case técnico Full Stack desenvolvido a partir de um problema real: reduzir o atendimento manual de uma clínica que recebe pedidos de horários pelo WhatsApp. A solução consulta disponibilidade, aplica regras de negócio no backend, organiza agendas independentes por profissional, encontra automaticamente o próximo horário livre, mantém histórico de atendimento e persiste os dados em Cloudflare D1.
+Case técnico Full Stack desenvolvido a partir de um problema real: reduzir o atendimento manual de uma clínica que recebe pedidos de horários pelo WhatsApp. A solução consulta disponibilidade, executa regras de negócio no backend, organiza agendas independentes por profissional, encontra o próximo horário livre, preserva histórico e persiste os dados em Cloudflare D1.
 
-> **Observação:** “Garde Agenda” é um conceito demonstrativo inspirado no contexto do desafio. Não é um produto oficial da Garde Inteligência Empresarial.
+> **Observação:** “Garde Agenda” é um conceito demonstrativo inspirado no contexto do desafio. Não é um produto oficial da Garde Inteligência Empresarial. O ambiente demonstrativo deve usar apenas dados fictícios.
 
 ## Produção
 
 **https://clinica-teste-agendamentos.hashickzvictorhugo.workers.dev**
 
-## Diferenciais implementados
+A área administrativa fica separada em `/admin` e exige uma credencial configurada como secret no Cloudflare Worker.
 
-Além dos requisitos mínimos do desafio, o projeto inclui:
+## Principais diferenciais
 
-- agenda **independente por profissional**;
-- quatro profissionais fictícios com especialidades diferentes;
-- disponibilidade exibida individualmente em cada card de profissional;
-- busca de **próximo horário disponível** entre médicos, datas e horários;
-- bloqueio automático de horários que já passaram no dia atual;
-- antecedência mínima de **30 minutos** para novos agendamentos e remarcações;
-- o mesmo horário pode ser usado por profissionais diferentes;
-- bloqueio de conflito quando **profissional + data + horário** coincidem;
-- bloqueio de duas consultas simultâneas para o mesmo paciente quando há telefone informado;
-- telefone/WhatsApp opcional do paciente;
-- botão para abrir o WhatsApp com uma mensagem de confirmação pronta — sem simular integração automática com a plataforma;
-- status `CONFIRMED`, `COMPLETED` e `CANCELLED`;
-- cancelamento lógico: o registro continua no histórico e o horário é liberado para nova reserva;
-- política de cancelamento com antecedência mínima de **60 minutos**;
-- conclusão permitida apenas depois do término real do horário reservado;
-- remarcação no mesmo registro, preservando o histórico do agendamento;
-- painel operacional com busca e filtros por data, profissional e status;
-- métricas de consultas confirmadas, concluídas e canceladas;
-- modal próprio de confirmação, toasts, skeletons e mensagens de erro específicas;
-- navegação e foco acessíveis, além de suporte a `prefers-reduced-motion`;
-- layout responsivo para desktop, tablet e celular;
-- deploy em Cloudflare Workers + D1;
-- CI com lint, TypeScript, testes e build.
+- landing page responsiva com experiência de produto completa;
+- quatro profissionais fictícios com agendas independentes;
+- consulta de disponibilidade por data e profissional;
+- busca automática de **próximo horário disponível**;
+- fuso de referência `America/Sao_Paulo` em frontend e backend;
+- atualização automática da data quando a página atravessa a meia-noite;
+- bloqueio de datas passadas e horários vencidos;
+- antecedência mínima de **30 minutos** para novos agendamentos/remarcações;
+- fins de semana e feriados nacionais de 2026 bloqueados no backend;
+- conflito de `profissional + data + horário` protegido também pelo banco;
+- bloqueio de duas consultas simultâneas para o mesmo telefone;
+- estados `CONFIRMED`, `COMPLETED` e `CANCELLED`;
+- cancelamento lógico com antecedência mínima de **60 minutos**;
+- conclusão somente após o término real do horário;
+- remarcação no mesmo registro;
+- área administrativa separada e autenticada;
+- dados pessoais nunca são listados pela API pública;
+- token administrativo mantido somente em memória, com expiração por inatividade;
+- rate limiting por origem e por telefone no agendamento;
+- rate limiting para tentativas administrativas inválidas;
+- honeypot no formulário público;
+- integração opcional com **Cloudflare Turnstile**, validada no backend;
+- payload JSON limitado a 8 KiB por tamanho real, não apenas por header;
+- CSP, HSTS e demais security headers;
+- D1 com índice único, `CHECK`s e triggers defensivas;
+- dependências travadas por `pnpm-lock.yaml`;
+- CI com lint, TypeScript, testes, build e auditoria de vulnerabilidades altas;
+- Dependabot para dependências npm e GitHub Actions.
 
-## Requisitos do desafio
-
-| Requisito | Implementação |
-| --- | --- |
-| Escolher uma data | Seletor de data no frontend |
-| Exibir horários disponíveis | `GET /available?date=AAAA-MM-DD&providerId=...` |
-| Criar agendamento | `POST /appointments` |
-| Listar agendamentos | `GET /appointments` |
-| Bloquear finais de semana | Validação no backend |
-| Bloquear feriados | Nager.Date consumida exclusivamente no backend |
-| Bloquear horários ocupados | Consulta de disponibilidade + índice único parcial no banco |
-| Horário 08:00–18:00 | 10 slots de 1 hora, com último início às 17:00 |
-| Persistência | Cloudflare D1 / SQLite com Drizzle ORM |
-| Dados de data e fuso | Dia da semana + `America/Sao_Paulo` retornados pela API |
-
-## Stack
-
-- **Frontend:** React 19 + TypeScript + Vinext/Vite
-- **Backend:** Route Handlers REST
-- **Banco:** Cloudflare D1 (SQLite) + Drizzle ORM
-- **API externa:** [Nager.Date](https://date.nager.at/api/v3/PublicHolidays/2026/BR)
-- **Testes:** Node.js Test Runner + SQLite em memória
-- **Qualidade:** ESLint, TypeScript e GitHub Actions
-- **Deploy:** Cloudflare Workers
-
-## Fluxo principal
+## Arquitetura de acesso
 
 ```text
-Paciente
-   │
-   ├── escolhe profissional + data
-   │        │
-   │        └── GET /available
-   │             ├── valida data, horário atual e antecedência mínima
-   │             ├── consulta feriados Nager.Date
-   │             └── consulta conflitos ativos do profissional no D1
-   │
-   ├── ou usa “Encontrar próximo horário”
-   │        │
-   │        └── GET /next-available
-   │             └── procura a primeira combinação futura e válida de data + horário + profissional
-   │
-   ▼
-Seleciona horário e informa paciente
-   │
-   ▼
-POST /appointments
-   │
-   ├── revalida todas as regras
-   ├── evita sobreposição do mesmo paciente quando há telefone
-   └── persiste no D1
-   │
-   ▼
-Agendamento confirmado
+Paciente / navegador público
+        │
+        ├── GET /available
+        ├── GET /next-available
+        └── POST /appointments
+                │
+                ├── valida payload
+                ├── rate limit IP + telefone
+                ├── Turnstile (quando configurado)
+                ├── regras de data/horário/feriado/conflito
+                └── Cloudflare D1
+
+Administrador
+        │
+        └── /admin
+              │
+              └── Authorization: Bearer <ADMIN_TOKEN>
+                    ├── GET /appointments?scope=admin
+                    ├── PATCH /appointments
+                    └── DELETE /appointments?id=...
 ```
+
+O frontend público não recebe a agenda operacional. Nome, telefone e histórico completo só são apresentados após autenticação administrativa validada pelo backend.
 
 ## Regras de negócio
 
@@ -100,51 +76,65 @@ Agendamento confirmado
 - funcionamento das **08:00 às 18:00**;
 - consultas de **1 hora**;
 - horários de início permitidos: `08:00` até `17:00`;
-- feriados nacionais de 2026 e finais de semana são bloqueados;
+- datas devem pertencer a 2026;
 - datas passadas não aceitam novos agendamentos;
-- no dia atual, horários já iniciados ou dentro da janela mínima de 30 minutos não ficam disponíveis;
-- a busca de próximo horário ignora automaticamente slots vencidos ou próximos demais;
-- cada profissional possui agenda independente;
-- o mesmo horário pode existir simultaneamente para profissionais diferentes;
-- o mesmo profissional não pode ter dois agendamentos ativos na mesma data e horário;
-- quando há telefone, o paciente não pode manter duas consultas ativas no mesmo horário;
-- agendamentos cancelados continuam no histórico, mas deixam de bloquear o horário;
-- cancelamentos são permitidos até 60 minutos antes da consulta;
-- consultas concluídas continuam contando como ocupação daquele registro;
-- uma consulta só pode ser concluída depois do término do horário reservado;
-- consultas concluídas e canceladas são estados terminais;
-- remarcação é permitida apenas para consultas confirmadas e revalida data, feriado, profissional, conflito e antecedência;
-- nome do paciente: 2–80 caracteres após normalização;
-- telefone/WhatsApp opcional: 8–13 dígitos após normalização;
-- datas usam `AAAA-MM-DD`;
-- fuso de referência: `America/Sao_Paulo`.
+- no dia atual, slots dentro da antecedência mínima de 30 minutos ficam indisponíveis;
+- o frontend diferencia horário ocupado, horário encerrado e bloqueio de calendário;
+- a busca de próximo horário ignora fins de semana, feriados, conflitos e slots vencidos;
+- cada profissional tem agenda independente;
+- profissionais diferentes podem usar o mesmo horário;
+- um profissional não pode ter dois agendamentos ativos no mesmo slot;
+- quando há telefone, o mesmo paciente não pode manter duas consultas ativas no mesmo horário;
+- cancelamentos preservam histórico e liberam o slot;
+- cancelamentos são permitidos até 60 minutos antes;
+- uma consulta só pode ser concluída depois do fim do horário reservado;
+- `COMPLETED` e `CANCELLED` são estados terminais;
+- remarcação só ocorre a partir de `CONFIRMED` e revalida todas as regras;
+- nome: 2–80 caracteres após normalização;
+- telefone opcional: 8–13 dígitos após normalização;
+- fuso: `America/Sao_Paulo`.
 
-### Concorrência
+## Concorrência e integridade do banco
 
-A disponibilidade mostrada pelo frontend não é garantia de reserva. O `POST` valida novamente as regras e o banco possui um índice único parcial em:
+O frontend nunca é a autoridade final. O `POST` revalida as regras e o D1 possui índice único parcial:
 
 ```text
 (provider_id, appointment_date, start_time)
 WHERE status <> 'CANCELLED'
 ```
 
-Se duas requisições tentarem reservar o mesmo profissional no mesmo horário, apenas uma é persistida e a outra recebe `409 SLOT_TAKEN`. Um registro cancelado deixa de participar do índice e libera o slot sem apagar o histórico.
+Assim, duas requisições concorrentes para o mesmo profissional/slot não criam duplicidade: apenas uma persiste e a outra recebe `409 SLOT_TAKEN`.
 
-### API externa indisponível
+O banco também mantém `CHECK`s de horário/status e triggers defensivas para validar:
 
-A lista de feriados fica em cache por seis horas. Se a Nager.Date não puder ser consultada, o sistema falha fechado com `503` e não cria nem sugere um agendamento sem validar a data.
+- nome do paciente;
+- formato do telefone;
+- IDs de profissionais permitidos;
+- ano da data do agendamento.
 
-## Endpoints
+Isso reduz a dependência exclusiva da camada de aplicação para preservar integridade.
 
-### `GET /available?date=2026-09-14&providerId=ana-martins`
+## API externa de feriados
 
-Retorna a agenda de um profissional, o dia da semana, fuso, feriado e os dez slots com disponibilidade. O retorno também inclui a política de antecedência mínima e o motivo de indisponibilidade de slots bloqueados. `providerId` é opcional por compatibilidade; quando omitido, o primeiro profissional é usado.
+Os feriados nacionais são obtidos da Nager.Date exclusivamente pelo backend:
 
-### `GET /next-available?fromDate=2026-09-14&providerId=all`
+`https://date.nager.at/api/v3/PublicHolidays/2026/BR`
 
-Procura o primeiro horário livre a partir da data informada. Com `providerId=all`, considera toda a equipe; também aceita um ID específico de profissional. Horários passados e slots dentro da antecedência mínima são ignorados automaticamente.
+A resposta fica em cache por seis horas. Se a API externa não puder ser validada, o sistema falha fechado com `503` em vez de criar um agendamento em uma data cuja regra de feriado não pôde ser confirmada.
+
+## Endpoints públicos
+
+### `GET /available?date=2026-09-15&providerId=ana-martins`
+
+Retorna somente informações de disponibilidade: profissional, dia da semana, fuso, feriado, política de antecedência e slots. Não retorna pacientes.
+
+### `GET /next-available?fromDate=2026-09-15&providerId=all`
+
+Procura a primeira combinação futura válida de profissional + data + horário.
 
 ### `POST /appointments`
+
+Exemplo:
 
 ```json
 {
@@ -152,59 +142,40 @@ Procura o primeiro horário livre a partir da data informada. Com `providerId=al
   "startTime": "09:00",
   "providerId": "ana-martins",
   "patientName": "Maria Silva",
-  "patientPhone": "18999999999"
+  "patientPhone": "18999999999",
+  "turnstileToken": "..."
 }
 ```
 
-Reserva válida retorna `201`. Entre os conflitos possíveis estão `SLOT_TAKEN`, `PATIENT_CONFLICT` e `BOOKING_TOO_SOON`.
+`turnstileToken` só é obrigatório quando as chaves do Turnstile estiverem configuradas no Worker.
+
+Uma criação válida retorna `201`, mas a resposta pública é minimizada e **não repete nome ou telefone**. Ela contém apenas protocolo/ID, data, horário, profissional, fuso e status.
 
 ### `GET /appointments`
 
-Retorna até 200 registros com profissional, paciente, data, horário, telefone e status. Suporta filtros opcionais:
+A chamada pública retorna uma coleção vazia marcada como protegida. A listagem de pacientes só é liberada no escopo administrativo autenticado.
+
+## Endpoints administrativos
+
+As rotas abaixo exigem:
 
 ```text
-?date=2026-09-15
-&providerId=ana-martins
-&status=CONFIRMED
-&q=Maria
+Authorization: Bearer <ADMIN_TOKEN>
 ```
 
-### `PATCH /appointments` — concluir
+### `GET /appointments?scope=admin`
 
-Marca uma consulta confirmada como concluída, somente depois do término do horário reservado:
+Retorna até 200 registros e aceita filtros opcionais por data, profissional, status e busca textual.
 
-```json
-{
-  "id": "appointment-id",
-  "status": "COMPLETED"
-}
-```
+### `PATCH /appointments`
 
-Consultas concluídas e canceladas permanecem como estados terminais no histórico.
-
-### `PATCH /appointments` — remarcar
-
-Remarca uma consulta confirmada sem criar um segundo registro:
-
-```json
-{
-  "id": "appointment-id",
-  "action": "RESCHEDULE",
-  "date": "2026-09-16",
-  "startTime": "15:00",
-  "providerId": "lucas-ferreira"
-}
-```
-
-A remarcação revalida antecedência mínima, dia útil, feriado, conflito do profissional e eventual sobreposição do paciente.
+Conclui ou remarca um registro. Remarcações revalidam antecedência, calendário, profissional e conflitos.
 
 ### `DELETE /appointments?id=<id>`
 
-Faz **cancelamento lógico** quando ainda existe pelo menos 60 minutos de antecedência. O registro recebe `CANCELLED`, continua visível no histórico e o slot volta a ficar disponível.
+Executa cancelamento lógico e mantém o registro no histórico.
 
-## Profissionais do ambiente demonstrativo
-
-Os nomes abaixo são fictícios e existem apenas para demonstrar agendas independentes:
+## Profissionais demonstrativos
 
 | ID | Profissional | Especialidade |
 | --- | --- | --- |
@@ -213,58 +184,120 @@ Os nomes abaixo são fictícios e existem apenas para demonstrar agendas indepen
 | `camila-rocha` | Dra. Camila Rocha | Dermatologia |
 | `beatriz-lima` | Dra. Beatriz Lima | Pediatria |
 
+## Segurança
+
+As decisões e limites estão detalhados em [`SECURITY.md`](./SECURITY.md).
+
+Resumo das proteções atuais:
+
+- secret administrativo fora do código-fonte;
+- autenticação e autorização executadas no backend;
+- falha fechada se o secret não existir;
+- comparação de token baseada em digest;
+- sessão administrativa apenas em memória e timeout por inatividade;
+- rate limiting por IP + telefone;
+- rate limiting de tentativas administrativas;
+- honeypot público;
+- Turnstile opcional com verificação server-side;
+- limite real de corpo JSON;
+- queries via Drizzle ORM;
+- minimização de PII nas respostas públicas;
+- `Cache-Control: no-store` em respostas sensíveis;
+- CSP, HSTS, frame protection, Permissions Policy, COOP/CORP e Referrer Policy restritiva;
+- banco com controles adicionais de integridade;
+- lockfile versionado e auditoria de dependências no CI.
+
+### Configurando o admin
+
+```powershell
+pnpm.cmd exec wrangler secret put ADMIN_TOKEN
+```
+
+A credencial nunca deve ser enviada para o GitHub.
+
+### Ativando o Cloudflare Turnstile
+
+Crie um widget Turnstile para o domínio/hostname da aplicação e configure **as duas** variáveis no Worker:
+
+```text
+TURNSTILE_SITE_KEY
+TURNSTILE_SECRET_KEY
+```
+
+`TURNSTILE_SITE_KEY` é pública e pode ser configurada como variável do Worker. `TURNSTILE_SECRET_KEY` deve ser configurada como secret. A funcionalidade só é ativada quando ambas estiverem presentes; sem elas, o restante do sistema continua funcionando normalmente.
+
+## Stack
+
+- **Frontend:** React 19 + TypeScript + Vinext/Vite
+- **Backend:** Route Handlers REST sobre Cloudflare Workers
+- **Banco:** Cloudflare D1 / SQLite + Drizzle ORM
+- **API externa:** Nager.Date
+- **Anti-bot:** Cloudflare Turnstile opcional
+- **Testes:** Node.js Test Runner + SQLite em memória
+- **Qualidade:** ESLint + TypeScript + GitHub Actions + pnpm audit
+- **Deploy:** Cloudflare Workers
+
 ## Executando localmente
 
-### Pré-requisitos
+Pré-requisitos:
 
 - Node.js **22.13+**
 - pnpm **11.19+**
 
 ```bash
-pnpm install
-pnpm run build
+pnpm install --frozen-lockfile
 pnpm run db:local:migrate
 pnpm run dev
 ```
 
-A aplicação fica em `http://localhost:5173`.
+Aplicação local: `http://localhost:5173`.
 
-## Deploy seguro
+Para validar tudo:
 
-O comando de release inspeciona o schema remoto antes de publicar e aplica **somente as migrações ainda ausentes**:
+```bash
+pnpm run check
+pnpm run audit
+```
+
+## Deploy e migração segura
+
+O fluxo recomendado para produção é:
 
 ```bash
 pnpm run release
 ```
 
-A rotina verifica, nesta ordem:
+No Windows/PowerShell:
+
+```powershell
+pnpm.cmd run release
+```
+
+Antes de publicar, o script inspeciona o schema remoto e aplica apenas o que estiver ausente:
 
 1. tabela base `appointments`;
-2. campo `patient_phone`;
-3. agenda por `provider_id`;
-4. histórico/status de agendamento.
+2. `patient_phone`;
+3. `provider_id` e agenda multi-profissional;
+4. status/histórico;
+5. triggers defensivas de integridade (`0004_harden_appointments.sql`).
 
-Isso evita reaplicar migrações de uso único em uma base que já foi atualizada.
+O fluxo é idempotente e evita reaplicar migrações de uso único já instaladas.
 
-Os comandos individuais continuam disponíveis para manutenção:
+## CI e supply chain
 
-```bash
-pnpm run db:remote:add-phone
-pnpm run db:remote:add-provider
-pnpm run db:remote:add-status
-```
+O workflow de CI:
 
-## Validação
+1. usa GitHub Actions fixadas por SHA;
+2. restaura cache do pnpm;
+3. instala com `--frozen-lockfile`;
+4. executa lint;
+5. executa TypeScript;
+6. executa testes;
+7. executa build;
+8. falha em vulnerabilidades de dependências de severidade alta ou crítica.
 
-```bash
-pnpm run check
-```
+O Dependabot verifica semanalmente dependências npm e GitHub Actions.
 
-Executa:
+## Escopo do case
 
-```bash
-pnpm run lint
-pnpm run typecheck
-pnpm run test
-pnpm run build
-```
+Este projeto demonstra engenharia de produto, regras de agenda, segurança defensiva e operação básica. Uma clínica real ainda deveria usar identidade individual por funcionário, MFA, RBAC, auditoria imutável, políticas de retenção/eliminação de PII, gestão de incidentes e controles organizacionais adequados ao tratamento de dados de saúde.

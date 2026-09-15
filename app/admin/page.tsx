@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { AdminDashboard } from "./AdminDashboard";
 import styles from "./admin.module.css";
 
@@ -19,7 +17,7 @@ export default function AdminPage() {
             <small>Área operacional protegida</small>
           </div>
         </div>
-        <Link className={styles.back} href="/">← Voltar ao agendamento público</Link>
+        <a className={styles.back} href="/">← Voltar ao agendamento público</a>
       </header>
 
       <div className={styles.shell}>

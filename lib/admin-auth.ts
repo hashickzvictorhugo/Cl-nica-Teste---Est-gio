@@ -1,11 +1,15 @@
 import { env } from "cloudflare:workers";
 
 import {
+  adminSecretsMisconfigured,
   canMutateAdmin,
   classifyAdminCredential,
   type AdminAccessLevel,
 } from "@/lib/admin-access";
-import { enforceAdminAttemptRateLimit } from "@/lib/booking-rate-limit";
+import {
+  enforceAdminAttemptRateLimit,
+  enforceAdminRequestRateLimit,
+} from "@/lib/booking-rate-limit";
 
 export type AdminAuthorization = {
   access: AdminAccessLevel | null;
@@ -37,25 +41,40 @@ function forbidden() {
   );
 }
 
+function unavailable(code: string, message: string) {
+  return Response.json(
+    { error: { code, message } },
+    { status: 503, headers: { "Cache-Control": "no-store" } },
+  );
+}
+
 async function rejectedAttempt(request: Request, message?: string) {
   const rateLimitError = await enforceAdminAttemptRateLimit(request);
   return rateLimitError ?? unauthorized(message);
 }
 
 export async function authorizeAdmin(request: Request): Promise<AdminAuthorization> {
+  const requestLimitError = await enforceAdminRequestRateLimit(request);
+  if (requestLimitError) return { access: null, error: requestLimitError };
+
   const adminToken = env.ADMIN_TOKEN?.trim();
   const demoToken = env.DEMO_ADMIN_TOKEN?.trim();
   if (!adminToken && !demoToken) {
     return {
       access: null,
-      error: Response.json(
-        {
-          error: {
-            code: "ADMIN_AUTH_UNAVAILABLE",
-            message: "A área administrativa está desativada até que uma credencial administrativa seja configurada.",
-          },
-        },
-        { status: 503, headers: { "Cache-Control": "no-store" } },
+      error: unavailable(
+        "ADMIN_AUTH_UNAVAILABLE",
+        "A área administrativa está desativada até que uma credencial administrativa seja configurada.",
+      ),
+    };
+  }
+
+  if (adminSecretsMisconfigured({ adminToken, demoToken })) {
+    return {
+      access: null,
+      error: unavailable(
+        "ADMIN_AUTH_MISCONFIGURED",
+        "As credenciais administrativas estão configuradas de forma insegura. O acesso foi bloqueado preventivamente.",
       ),
     };
   }

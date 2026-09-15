@@ -14,6 +14,7 @@ import {
   HolidayServiceError,
 } from "@/lib/holiday-service";
 import { getProviderById, resolveProvider } from "@/lib/providers";
+import { JsonBodyError, readJsonObject } from "@/lib/request-json";
 import {
   BOOKING_MIN_LEAD_MINUTES,
   CANCELLATION_MIN_LEAD_MINUTES,
@@ -37,21 +38,24 @@ function normalizedStatus(value: string): AppointmentStatus {
   return isAppointmentStatus(value) ? value : "CONFIRMED";
 }
 
-function presentAppointment(row: typeof appointments.$inferSelect) {
-  const provider = getProviderById(row.providerId);
+function providerFor(row: typeof appointments.$inferSelect) {
+  return getProviderById(row.providerId) ?? {
+    id: row.providerId,
+    name: "Profissional",
+    specialty: "Atendimento",
+    initials: "PR",
+    description: "",
+  };
+}
+
+function presentAdminAppointment(row: typeof appointments.$inferSelect) {
   return {
     id: row.id,
     date: row.appointmentDate,
     startTime: row.startTime,
     endTime: isValidStartTime(row.startTime) ? getEndTime(row.startTime) : row.startTime,
     timezone: TIMEZONE,
-    provider: provider ?? {
-      id: row.providerId,
-      name: "Profissional",
-      specialty: "Atendimento",
-      initials: "PR",
-      description: "",
-    },
+    provider: providerFor(row),
     patientName: row.patientName,
     patientPhone: row.patientPhone ?? "",
     status: normalizedStatus(row.status),
@@ -62,9 +66,23 @@ function presentAppointment(row: typeof appointments.$inferSelect) {
   };
 }
 
-function bodyTooLarge(request: Request) {
-  const length = Number(request.headers.get("content-length") ?? "0");
-  return Number.isFinite(length) && length > 8_192;
+function presentPublicConfirmation(row: typeof appointments.$inferSelect) {
+  return {
+    id: row.id,
+    date: row.appointmentDate,
+    startTime: row.startTime,
+    endTime: isValidStartTime(row.startTime) ? getEndTime(row.startTime) : row.startTime,
+    timezone: TIMEZONE,
+    provider: providerFor(row),
+    status: normalizedStatus(row.status),
+  };
+}
+
+function jsonBodyError(error: unknown, fallback: string) {
+  if (error instanceof JsonBodyError) {
+    return jsonError(error.status, error.code, error.message);
+  }
+  return jsonError(400, "VALIDATION_ERROR", fallback);
 }
 
 async function patientHasConflict({
@@ -170,7 +188,7 @@ export async function GET(request: Request) {
       .limit(200);
 
     return Response.json(
-      { appointments: rows.map(presentAppointment), count: rows.length, protected: true },
+      { appointments: rows.map(presentAdminAppointment), count: rows.length, protected: true },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
@@ -179,17 +197,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (bodyTooLarge(request)) {
-    return jsonError(413, "VALIDATION_ERROR", "A solicitação excede o tamanho permitido.");
-  }
-
   let payload: Record<string, unknown>;
   try {
-    const body: unknown = await request.json();
-    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Expected JSON object");
-    payload = body as Record<string, unknown>;
-  } catch {
-    return jsonError(400, "VALIDATION_ERROR", "Envie os dados do agendamento em JSON.");
+    payload = await readJsonObject(request);
+  } catch (error) {
+    return jsonBodyError(error, "Envie os dados do agendamento em JSON.");
+  }
+
+  if (typeof payload.website === "string" && payload.website.trim()) {
+    return jsonError(400, "AUTOMATION_REJECTED", "Não foi possível validar o formulário.");
   }
 
   const date = payload.date;
@@ -260,7 +276,7 @@ export async function POST(request: Request) {
     }
 
     return Response.json(
-      { message: "Agendamento confirmado.", appointment: presentAppointment(created[0]) },
+      { message: "Agendamento confirmado.", appointment: presentPublicConfirmation(created[0]) },
       { status: 201, headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
@@ -274,15 +290,12 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const authError = await requireAdmin(request);
   if (authError) return authError;
-  if (bodyTooLarge(request)) return jsonError(413, "VALIDATION_ERROR", "A solicitação excede o tamanho permitido.");
 
   let payload: Record<string, unknown>;
   try {
-    const body: unknown = await request.json();
-    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Expected JSON object");
-    payload = body as Record<string, unknown>;
-  } catch {
-    return jsonError(400, "VALIDATION_ERROR", "Envie a atualização em JSON.");
+    payload = await readJsonObject(request);
+  } catch (error) {
+    return jsonBodyError(error, "Envie a atualização em JSON.");
   }
 
   const id = typeof payload.id === "string" ? payload.id.trim() : "";
@@ -346,7 +359,7 @@ export async function PATCH(request: Request) {
         .returning();
 
       return Response.json(
-        { message: "Agendamento remarcado com sucesso.", appointment: presentAppointment(updated[0]) },
+        { message: "Agendamento remarcado com sucesso.", appointment: presentAdminAppointment(updated[0]) },
         { headers: { "Cache-Control": "no-store" } },
       );
     }
@@ -360,7 +373,7 @@ export async function PATCH(request: Request) {
     if (currentStatus === "COMPLETED") {
       if (status === "COMPLETED") {
         return Response.json(
-          { message: "Consulta já estava concluída.", appointment: presentAppointment(current[0]) },
+          { message: "Consulta já estava concluída.", appointment: presentAdminAppointment(current[0]) },
           { headers: { "Cache-Control": "no-store" } },
         );
       }
@@ -368,7 +381,7 @@ export async function PATCH(request: Request) {
     }
     if (status === "CONFIRMED") {
       return Response.json(
-        { message: "Consulta já está confirmada.", appointment: presentAppointment(current[0]) },
+        { message: "Consulta já está confirmada.", appointment: presentAdminAppointment(current[0]) },
         { headers: { "Cache-Control": "no-store" } },
       );
     }
@@ -384,7 +397,7 @@ export async function PATCH(request: Request) {
       .returning();
 
     return Response.json(
-      { message: "Consulta marcada como concluída.", appointment: presentAppointment(updated[0]) },
+      { message: "Consulta marcada como concluída.", appointment: presentAdminAppointment(updated[0]) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
@@ -409,7 +422,7 @@ export async function DELETE(request: Request) {
     const currentStatus = normalizedStatus(current[0].status);
     if (currentStatus === "CANCELLED") {
       return Response.json(
-        { message: "Agendamento já estava cancelado.", appointment: presentAppointment(current[0]) },
+        { message: "Agendamento já estava cancelado.", appointment: presentAdminAppointment(current[0]) },
         { headers: { "Cache-Control": "no-store" } },
       );
     }
@@ -435,7 +448,7 @@ export async function DELETE(request: Request) {
       .returning();
 
     return Response.json(
-      { message: "Agendamento cancelado e mantido no histórico.", appointment: presentAppointment(cancelled[0]) },
+      { message: "Agendamento cancelado e mantido no histórico.", appointment: presentAdminAppointment(cancelled[0]) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

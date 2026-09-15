@@ -3,6 +3,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { getDb } from "@/db";
 import { appointments } from "@/db/schema";
 import { databaseError, jsonError } from "@/lib/api-response";
+import { enforcePublicReadRateLimit } from "@/lib/booking-rate-limit";
 import {
   getHolidayForDate,
   HolidayServiceError,
@@ -24,6 +25,9 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const rateLimitError = await enforcePublicReadRateLimit(request, "available");
+  if (rateLimitError) return rateLimitError;
+
   const url = new URL(request.url);
   const date = url.searchParams.get("date");
   const provider = resolveProvider(url.searchParams.get("providerId"));
@@ -54,8 +58,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const holiday = await getHolidayForDate(date);
     const weekend = isWeekend(date);
+    const holiday = weekend ? null : await getHolidayForDate(date);
     const blockedReason = weekend ? "WEEKEND" : holiday ? "HOLIDAY" : null;
 
     const occupiedRows = blockedReason

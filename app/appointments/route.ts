@@ -1,4 +1,4 @@
-import { and, asc, eq, like, or } from "drizzle-orm";
+import { and, asc, eq, like, ne, or } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { appointments } from "@/db/schema";
@@ -13,13 +13,16 @@ import {
 } from "@/lib/holiday-service";
 import { getProviderById, resolveProvider } from "@/lib/providers";
 import {
+  BOOKING_MIN_LEAD_MINUTES,
+  CANCELLATION_MIN_LEAD_MINUTES,
   getEndTime,
   hasSlotEnded,
-  hasSlotStarted,
   isPastDate,
+  isSlotBookable,
   isSupportedDate,
   isValidStartTime,
   isWeekend,
+  isWithinCancellationWindow,
   sanitizePatientName,
   sanitizePatientPhone,
   SCHEDULING_YEAR,
@@ -57,6 +60,64 @@ function presentAppointment(row: typeof appointments.$inferSelect) {
     cancelledAt: row.cancelledAt ?? null,
     completedAt: row.completedAt ?? null,
   };
+}
+
+async function patientHasConflict({
+  patientPhone,
+  date,
+  startTime,
+  excludeId,
+}: {
+  patientPhone: string;
+  date: string;
+  startTime: string;
+  excludeId?: string;
+}) {
+  if (!patientPhone) return false;
+
+  const predicates = [
+    eq(appointments.patientPhone, patientPhone),
+    eq(appointments.appointmentDate, date),
+    eq(appointments.startTime, startTime),
+    ne(appointments.status, "CANCELLED"),
+  ];
+  if (excludeId) predicates.push(ne(appointments.id, excludeId));
+
+  const rows = await getDb()
+    .select({ id: appointments.id })
+    .from(appointments)
+    .where(and(...predicates))
+    .limit(1);
+
+  return rows.length > 0;
+}
+
+async function providerSlotTaken({
+  providerId,
+  date,
+  startTime,
+  excludeId,
+}: {
+  providerId: string;
+  date: string;
+  startTime: string;
+  excludeId?: string;
+}) {
+  const predicates = [
+    eq(appointments.providerId, providerId),
+    eq(appointments.appointmentDate, date),
+    eq(appointments.startTime, startTime),
+    ne(appointments.status, "CANCELLED"),
+  ];
+  if (excludeId) predicates.push(ne(appointments.id, excludeId));
+
+  const rows = await getDb()
+    .select({ id: appointments.id })
+    .from(appointments)
+    .where(and(...predicates))
+    .limit(1);
+
+  return rows.length > 0;
 }
 
 export async function GET(request: Request) {
@@ -188,11 +249,11 @@ export async function POST(request: Request) {
     );
   }
 
-  if (hasSlotStarted(date, startTime, schedulingNow)) {
+  if (!isSlotBookable(date, startTime, schedulingNow)) {
     return jsonError(
       422,
-      "PAST_SLOT",
-      "Esse horário já começou ou passou. Escolha um horário futuro.",
+      "BOOKING_TOO_SOON",
+      `O agendamento precisa ser feito com pelo menos ${BOOKING_MIN_LEAD_MINUTES} minutos de antecedência.`,
     );
   }
 
@@ -228,6 +289,17 @@ export async function POST(request: Request) {
         422,
         "HOLIDAY",
         `Não há atendimento em ${holiday.localName}. Escolha outra data.`,
+      );
+    }
+
+    if (
+      patientPhone &&
+      await patientHasConflict({ patientPhone, date, startTime })
+    ) {
+      return jsonError(
+        409,
+        "PATIENT_CONFLICT",
+        "Este telefone já possui outra consulta ativa nesse mesmo horário.",
       );
     }
 
@@ -295,18 +367,11 @@ export async function PATCH(request: Request) {
   }
 
   const id = typeof payload.id === "string" ? payload.id.trim() : "";
+  const action = payload.action;
   const status = payload.status;
 
   if (!id) {
     return jsonError(400, "VALIDATION_ERROR", "Informe o agendamento que deseja atualizar.");
-  }
-
-  if (status !== "COMPLETED" && status !== "CONFIRMED") {
-    return jsonError(
-      400,
-      "INVALID_STATUS",
-      "A atualização permite marcar a consulta como concluída ou confirmada.",
-    );
   }
 
   try {
@@ -321,6 +386,136 @@ export async function PATCH(request: Request) {
     }
 
     const currentStatus = normalizedStatus(current[0].status);
+
+    if (action === "RESCHEDULE") {
+      if (currentStatus !== "CONFIRMED") {
+        return jsonError(
+          409,
+          "INVALID_TRANSITION",
+          "Somente consultas confirmadas podem ser remarcadas.",
+        );
+      }
+
+      const date = payload.date;
+      const startTime = payload.startTime;
+      const provider = resolveProvider(payload.providerId);
+      const schedulingNow = new Date();
+
+      if (!isSupportedDate(date)) {
+        return jsonError(
+          400,
+          "INVALID_DATE",
+          `Informe uma data válida de ${SCHEDULING_YEAR} no formato AAAA-MM-DD.`,
+        );
+      }
+
+      if (isPastDate(date, schedulingNow)) {
+        return jsonError(
+          422,
+          "PAST_DATE",
+          "Não é possível remarcar para uma data que já passou.",
+        );
+      }
+
+      if (!provider) {
+        return jsonError(
+          400,
+          "INVALID_PROVIDER",
+          "Escolha um profissional válido para o novo horário.",
+        );
+      }
+
+      if (!isValidStartTime(startTime)) {
+        return jsonError(
+          422,
+          "INVALID_SLOT",
+          "Escolha um horário cheio entre 08:00 e 17:00.",
+        );
+      }
+
+      if (!isSlotBookable(date, startTime, schedulingNow)) {
+        return jsonError(
+          422,
+          "BOOKING_TOO_SOON",
+          `A remarcação precisa respeitar pelo menos ${BOOKING_MIN_LEAD_MINUTES} minutos de antecedência.`,
+        );
+      }
+
+      const holiday = await getHolidayForDate(date);
+      if (isWeekend(date)) {
+        return jsonError(
+          422,
+          "WEEKEND",
+          "A clínica não abre aos fins de semana. Escolha um dia útil.",
+        );
+      }
+      if (holiday) {
+        return jsonError(
+          422,
+          "HOLIDAY",
+          `Não há atendimento em ${holiday.localName}. Escolha outra data.`,
+        );
+      }
+
+      if (
+        await providerSlotTaken({
+          providerId: provider.id,
+          date,
+          startTime,
+          excludeId: id,
+        })
+      ) {
+        return jsonError(
+          409,
+          "SLOT_TAKEN",
+          `Esse horário com ${provider.name} já está reservado. Escolha outro.`,
+        );
+      }
+
+      if (
+        current[0].patientPhone &&
+        await patientHasConflict({
+          patientPhone: current[0].patientPhone,
+          date,
+          startTime,
+          excludeId: id,
+        })
+      ) {
+        return jsonError(
+          409,
+          "PATIENT_CONFLICT",
+          "O paciente já possui outra consulta ativa nesse mesmo horário.",
+        );
+      }
+
+      const updated = await getDb()
+        .update(appointments)
+        .set({
+          appointmentDate: date,
+          startTime,
+          providerId: provider.id,
+          updatedAt: schedulingNow.toISOString(),
+        })
+        .where(eq(appointments.id, id))
+        .returning();
+
+      return Response.json(
+        {
+          message: "Agendamento remarcado com sucesso.",
+          appointment: presentAppointment(updated[0]),
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    if (status !== "COMPLETED" && status !== "CONFIRMED") {
+      return jsonError(
+        400,
+        "INVALID_STATUS",
+        "A atualização permite marcar a consulta como concluída ou confirmada.",
+      );
+    }
+
     if (currentStatus === "CANCELLED") {
       return jsonError(
         409,
@@ -380,6 +575,13 @@ export async function PATCH(request: Request) {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
+    if (error instanceof HolidayServiceError) {
+      return jsonError(
+        503,
+        "HOLIDAY_SERVICE_UNAVAILABLE",
+        "Não foi possível verificar os feriados agora. Tente novamente em instantes.",
+      );
+    }
     return databaseError(error);
   }
 }
@@ -414,6 +616,21 @@ export async function DELETE(request: Request) {
         409,
         "INVALID_TRANSITION",
         "Uma consulta concluída permanece no histórico e não pode ser cancelada.",
+      );
+    }
+
+    if (
+      !isValidStartTime(current[0].startTime) ||
+      isWithinCancellationWindow(
+        current[0].appointmentDate,
+        current[0].startTime,
+        new Date(),
+      )
+    ) {
+      return jsonError(
+        409,
+        "CANCELLATION_TOO_LATE",
+        `Cancelamentos são permitidos até ${CANCELLATION_MIN_LEAD_MINUTES} minutos antes do horário marcado.`,
       );
     }
 

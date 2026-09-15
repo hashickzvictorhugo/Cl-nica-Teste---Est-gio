@@ -1,9 +1,11 @@
+import { AdminBackButton } from "./AdminBackButton";
 import { AdminDashboard } from "./AdminDashboard";
 import styles from "./admin.module.css";
 
 export const metadata = {
   title: "Admin | Garde Agenda",
   description: "Área administrativa protegida da agenda demonstrativa.",
+  robots: { index: false, follow: false },
 };
 
 export default function AdminPage() {
@@ -17,7 +19,7 @@ export default function AdminPage() {
             <small>Área operacional protegida</small>
           </div>
         </div>
-        <a className={styles.back} href="/">← Voltar ao agendamento público</a>
+        <AdminBackButton />
       </header>
 
       <div className={styles.shell}>

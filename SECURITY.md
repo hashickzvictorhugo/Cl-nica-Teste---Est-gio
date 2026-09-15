@@ -147,7 +147,7 @@ A chave pública é entregue ao frontend por `/security-config`; a chave secreta
 - remarcação, conclusão e cancelamento usam atualização condicional por estado para impedir lost updates em operações concorrentes;
 - conflitos detectados pela constraint do banco são convertidos em resposta de conflito, sem expor parâmetros internos;
 - alterações operacionais relevantes geram trilha de auditoria append-only, com proteção contra `UPDATE` e `DELETE` no próprio banco;
-- a aplicação registra a identidade individual validada pelo Cloudflare Access quando disponível, enquanto um trigger de banco mantém uma trilha defensiva mesmo fora do fluxo normal da aplicação.
+- a trilha mínima é gerada por trigger do D1, inclusive para alterações fora da rota normal; quando Cloudflare Access está habilitado, a identidade individual permanece disponível nos logs do Access e deve ser integrada à observabilidade/SIEM operacional.
 
 ### Navegador e transporte
 

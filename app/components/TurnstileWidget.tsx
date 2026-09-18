@@ -122,13 +122,10 @@ export function TurnstileWidget({
 
   if (!enabled) {
     return (
-      <div className="security-check" role="status">
+      <div className="security-check" role="alert">
         <div>
-          <strong>Modo compatibilidade de segurança</strong>
-          <span>
-            O Turnstile não está disponível nesta rede. O agendamento continua protegido por
-            validação de origem, honeypot e limites de requisição no servidor.
-          </span>
+          <strong>Verificação de segurança indisponível</strong>
+          <span>O agendamento permanece bloqueado até a proteção anti-bot estar configurada.</span>
         </div>
       </div>
     );

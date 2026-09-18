@@ -125,7 +125,7 @@ export function TurnstileWidget({
       <div className="security-check" role="alert">
         <div>
           <strong>Verificação de segurança indisponível</strong>
-          <span>O agendamento permanece bloqueado até a proteção anti-bot estar disponível.</span>
+          <span>O agendamento permanece bloqueado até a proteção anti-bot estar configurada.</span>
         </div>
       </div>
     );
@@ -138,7 +138,12 @@ export function TurnstileWidget({
         <span>Proteção Cloudflare Turnstile antes de confirmar o agendamento.</span>
       </div>
       <div ref={containerRef} />
-      {status === "error" ? <small>Não foi possível carregar a verificação. Atualize a página e tente novamente.</small> : null}
+      {status === "error" ? (
+        <small>
+          O Turnstile foi bloqueado ou não carregou nesta rede. Você ainda pode confirmar:
+          o servidor aplicará as proteções alternativas de compatibilidade.
+        </small>
+      ) : null}
     </div>
   );
 }

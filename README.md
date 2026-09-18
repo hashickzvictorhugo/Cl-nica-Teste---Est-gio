@@ -73,7 +73,7 @@ O case evita coletar CPF, RG, endereço, medicamentos ou histórico clínico det
 - rate limiting por origem e por telefone no agendamento;
 - rate limiting para tentativas administrativas inválidas;
 - honeypot no formulário público;
-- integração opcional com **Cloudflare Turnstile**, validada no backend;
+- **Cloudflare Turnstile** como proteção anti-bot preferencial, com fallback restrito a requisições same-origin quando a rede/navegador não consegue carregar o desafio;
 - payload JSON limitado a 8 KiB por tamanho real, não apenas por header;
 - CSP, HSTS e demais security headers;
 - D1 com índice único, `CHECK`s e triggers defensivas;
@@ -93,7 +93,7 @@ Paciente / navegador público
                 │
                 ├── valida payload + pré-atendimento
                 ├── rate limit IP + telefone
-                ├── Turnstile (quando configurado)
+                ├── Turnstile preferencial ou fallback same-origin com rate limit + honeypot
                 ├── regras de data/horário/feriado/conflito
                 └── Cloudflare D1
 
@@ -200,7 +200,7 @@ Exemplo:
 }
 ```
 
-`turnstileToken` só é obrigatório quando as chaves do Turnstile estiverem configuradas no Worker.
+`turnstileToken` é validado quando o desafio do Turnstile consegue carregar. Em redes que bloqueiam o domínio do desafio, o navegador pode usar o modo de compatibilidade: o backend exige origem same-origin e mantém rate limiting por origem/telefone, honeypot e todas as validações de negócio.
 
 Uma criação válida retorna `201`, mas a resposta pública é minimizada e **não repete nome, telefone, motivo, duração, tipo ou observações**. Ela contém apenas protocolo/ID, data, horário, profissional, fuso e status.
 
@@ -258,7 +258,7 @@ Resumo:
 - comparação de token baseada em digest;
 - sessão administrativa apenas em memória e timeout por inatividade;
 - rate limiting por origem + telefone;
-- honeypot e Turnstile;
+- honeypot, Turnstile preferencial e fallback de compatibilidade restrito a same-origin;
 - limite real de corpo JSON;
 - queries via Drizzle ORM;
 - minimização de PII e conteúdo de pré-atendimento nas respostas públicas;
@@ -273,7 +273,7 @@ Resumo:
 - **Backend:** Route Handlers REST sobre Cloudflare Workers
 - **Banco:** Cloudflare D1 / SQLite + Drizzle ORM
 - **API externa:** Nager.Date
-- **Anti-bot:** Cloudflare Turnstile opcional
+- **Anti-bot:** Cloudflare Turnstile preferencial + fallback same-origin para redes restritivas
 - **Testes:** Node.js Test Runner + SQLite em memória
 - **Qualidade:** ESLint + TypeScript + GitHub Actions + CodeQL + pnpm audit
 - **Deploy:** Cloudflare Workers

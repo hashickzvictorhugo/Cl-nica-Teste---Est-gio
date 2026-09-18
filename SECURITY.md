@@ -114,13 +114,15 @@ pnpm.cmd run release
 - segundo limite por telefone normalizado;
 - limites próprios para consultas públicas de disponibilidade e para a área administrativa;
 - honeypot silencioso no formulário público;
-- Cloudflare Turnstile validado novamente no backend;
-- o Turnstile é fail-closed no endpoint de criação: sem configuração válida, o backend não aceita novos agendamentos;
-- a resposta do Turnstile é vinculada ao hostname da requisição e à action `book_appointment`;
+- Cloudflare Turnstile validado novamente no backend quando o desafio está disponível;
+- se o desafio não carregar por bloqueio de rede/navegador, existe um fallback de compatibilidade aceito apenas quando `Origin` corresponde à própria aplicação e `Sec-Fetch-Site` é `same-origin`;
+- o fallback não substitui o Turnstile como prova de humanidade: ele depende das camadas restantes de antiabuso (rate limit por origem/telefone, honeypot e validações server-side) para priorizar compatibilidade em redes institucionais;
+- tokens Turnstile presentes continuam sendo validados normalmente e uma validação explícita que falha não cai silenciosamente para o fallback;
+- a resposta válida do Turnstile é vinculada ao hostname da requisição e à action `book_appointment`;
 - limite real de 8 KiB para JSON aplicado durante a leitura incremental do stream, sem depender de `Content-Length`;
 - mutações com `Origin` incompatível ou `Sec-Fetch-Site: cross-site` são rejeitadas.
 
-O Turnstile exige as duas variáveis abaixo no Worker:
+Para usar o Turnstile como proteção principal, configure as duas variáveis abaixo no Worker:
 
 ```text
 TURNSTILE_SITE_KEY

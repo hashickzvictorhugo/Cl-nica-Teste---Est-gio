@@ -41,11 +41,10 @@ export async function verifyTurnstile(
   const fallbackAllowed = sameOriginBrowserFallbackAllowed(request);
 
   if (!turnstileEnabled()) {
-    if (fallbackAllowed) return null;
     return turnstileError(
       503,
       "TURNSTILE_UNAVAILABLE",
-      "A proteção anti-bot principal não está disponível para esta requisição.",
+      "A proteção anti-bot não está configurada. O agendamento foi bloqueado preventivamente.",
     );
   }
 

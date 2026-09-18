@@ -19,6 +19,14 @@ export function getTurnstileSiteKey() {
   return turnstileEnabled() ? env.TURNSTILE_SITE_KEY!.trim() : "";
 }
 
+function sameOriginBrowserFallbackAllowed(request: Request) {
+  const expectedOrigin = new URL(request.url).origin;
+  const origin = request.headers.get("Origin")?.trim();
+  const fetchSite = request.headers.get("Sec-Fetch-Site")?.trim().toLowerCase();
+
+  return origin === expectedOrigin && fetchSite === "same-origin";
+}
+
 function turnstileError(status: number, code: string, message: string) {
   return Response.json(
     { error: { code, message } },
@@ -30,15 +38,19 @@ export async function verifyTurnstile(
   request: Request,
   token: unknown,
 ): Promise<Response | null> {
+  const fallbackAllowed = sameOriginBrowserFallbackAllowed(request);
+
   if (!turnstileEnabled()) {
+    if (fallbackAllowed) return null;
     return turnstileError(
       503,
       "TURNSTILE_UNAVAILABLE",
-      "A proteção anti-bot não está configurada. O agendamento foi bloqueado preventivamente.",
+      "A proteção anti-bot principal não está disponível para esta requisição.",
     );
   }
 
   if (typeof token !== "string" || !token.trim()) {
+    if (fallbackAllowed) return null;
     return turnstileError(
       400,
       "TURNSTILE_REQUIRED",

@@ -200,7 +200,7 @@ Exemplo:
 }
 ```
 
-`turnstileToken` é validado quando o desafio do Turnstile consegue carregar. Em redes que bloqueiam o domínio do desafio, o navegador pode usar o modo de compatibilidade: o backend exige origem same-origin e mantém rate limiting por origem/telefone, honeypot e todas as validações de negócio.
+`turnstileToken` é validado quando o desafio do Turnstile consegue carregar. Com as chaves corretamente configuradas, redes que bloqueiam o domínio do desafio podem usar o modo de compatibilidade: o backend exige origem same-origin e mantém rate limiting por origem/telefone, honeypot e todas as validações de negócio. Se as chaves do Turnstile não estiverem configuradas no Worker, a criação continua bloqueada.
 
 Uma criação válida retorna `201`, mas a resposta pública é minimizada e **não repete nome, telefone, motivo, duração, tipo ou observações**. Ela contém apenas protocolo/ID, data, horário, profissional, fuso e status.
 

@@ -22,8 +22,8 @@ importers:
         version: 19.2.8(react@19.2.8)
     devDependencies:
       '@cloudflare/vite-plugin':
-        specifier: 1.54.9
-        version: 1.54.9(@types/node@22.19.19)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))(wrangler@4.131.2(@cloudflare/workers-types@4.20260515.1)(@types/node@22.19.19))
+        specifier: 1.55.0
+        version: 1.55.0(@types/node@22.19.19)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))(wrangler@4.134.0(@cloudflare/workers-types@4.20260515.1)(@types/node@22.19.19))
       '@cloudflare/workers-types':
         specifier: 4.20260515.1
         version: 4.20260515.1
@@ -40,8 +40,8 @@ importers:
         specifier: 6.1.1
         version: 6.1.1(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))
       '@vitejs/plugin-rsc':
-        specifier: 0.5.34
-        version: 0.5.34(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))
+        specifier: 0.5.35
+        version: 0.5.35(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))
       drizzle-kit:
         specifier: 0.31.10
         version: 0.31.10
@@ -52,20 +52,20 @@ importers:
         specifier: 16.3.5
         version: 16.3.5(@typescript-eslint/parser@8.70.0(eslint@9.39.4(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.9.3))(eslint@9.39.4(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.9.3)
       react-server-dom-webpack:
-        specifier: 19.2.8
-        version: 19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19)))
+        specifier: 19.3.0
+        version: 19.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19)))
       typescript:
         specifier: 5.9.3
         version: 5.9.3
       vinext:
         specifier: 1.0.0-beta.9
-        version: 1.0.0-beta.9(@vitejs/plugin-react@6.1.1(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)))(@vitejs/plugin-rsc@0.5.34(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)))(next@16.3.5(@babel/core@7.29.7(supports-color@10.2.2))(@types/node@22.19.19)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))
+        version: 1.0.0-beta.9(@vitejs/plugin-react@6.1.1(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)))(@vitejs/plugin-rsc@0.5.35(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)))(next@16.3.5(@babel/core@7.29.7(supports-color@10.2.2))(@types/node@22.19.19)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))
       vite:
         specifier: 8.3.0
         version: 8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)
       wrangler:
-        specifier: 4.131.2
-        version: 4.131.2(@cloudflare/workers-types@4.20260515.1)(@types/node@22.19.19)
+        specifier: 4.134.0
+        version: 4.134.0(@cloudflare/workers-types@4.20260515.1)(@types/node@22.19.19)
 
 packages:
 
@@ -149,39 +149,39 @@ packages:
       workerd:
         optional: true
 
-  '@cloudflare/vite-plugin@1.54.9':
-    resolution: {integrity: sha512-Xel2LS9BBHWPYUDp+gjIm8MXuf4aimyJajo3VNLtdvRya++NuKHd0ZNpHQTchlulV/hjkS3e7MvVlZxGvJzqDQ==}
+  '@cloudflare/vite-plugin@1.55.0':
+    resolution: {integrity: sha512-CZ20D6NmsR+bGKUx2Ne4r5BW+r2/RPa7Bjd7jj1VowE5V9gEKV81yS6ml+rXRKzOY0ZuHYZbFnctnoU0FdlxcA==}
     hasBin: true
     peerDependencies:
       vite: ^6.1.0 || ^7.0.0 || ^8.0.0
-      wrangler: ^4.131.2
+      wrangler: ^4.134.0
 
-  '@cloudflare/workerd-darwin-64@1.20260911.1':
-    resolution: {integrity: sha512-785eaY1bkR1cm4Z/PCUeteZYmTMe6lre2zz63/GdGGimsoMsKxgl4brFPRukim8iv28EyD1XoCB/VPYF20BERA==}
+  '@cloudflare/workerd-darwin-64@1.20260917.1':
+    resolution: {integrity: sha512-ufFpLi2+WIuifZOiW38N8hzcX1tqfCqxYWgRC3tgT78TzjxUiBPcSkNdwv8dxeQ9xApwQh3BnQiFhfzq67umew==}
     engines: {node: '>=16'}
     cpu: [x64]
     os: [darwin]
 
-  '@cloudflare/workerd-darwin-arm64@1.20260911.1':
-    resolution: {integrity: sha512-WU4bFqEN0H7ndGWxoedegv95DmNVBtv0ncXcHG9nYFTUI78sxEb0qoT3U6Ga4hyBkzsJFBX/zvVBIGX3qKldGA==}
+  '@cloudflare/workerd-darwin-arm64@1.20260917.1':
+    resolution: {integrity: sha512-rbdal3kspPfG5O55I9IVHdBv2SH6UJMh66JkmdLIXuN2oS6WYctP226hKQJIme8mLW7XebRjL+ZnVbVES2SrkQ==}
     engines: {node: '>=16'}
     cpu: [arm64]
     os: [darwin]
 
-  '@cloudflare/workerd-linux-64@1.20260911.1':
-    resolution: {integrity: sha512-0Y2gy62oxQxWa38qinSPE6zNL5+JmumJtDY9AWW1HB8KHuATxN71o5MGzmVFfB8PwZsiHfUd2Sv7O22krCOrhw==}
+  '@cloudflare/workerd-linux-64@1.20260917.1':
+    resolution: {integrity: sha512-t981nh4Ol5mjzkH6x7x7Oev/UVmF5n3zjm07btl58BxJ1IgUSUPW0XJz07DR7rWss/EmGey7UlRMUM0qRcWkvg==}
     engines: {node: '>=16'}
     cpu: [x64]
     os: [linux]
 
-  '@cloudflare/workerd-linux-arm64@1.20260911.1':
-    resolution: {integrity: sha512-kttNPnx1r2lCqFUoMH62z7CqGV+j4QBbw5fdtaz4pzOrzBv0AWkNATt7onFUe+SwP8zhcepMtbm2F4kKzTf6VA==}
+  '@cloudflare/workerd-linux-arm64@1.20260917.1':
+    resolution: {integrity: sha512-3nW87yjIxhchhI7ZqbeQsy0Rfzw+7aZVADN/iDF0v1JOH3IxGsExEGGWYB+nQQQG4rUvnBlRTFT4WG21mVB02Q==}
     engines: {node: '>=16'}
     cpu: [arm64]
     os: [linux]
 
-  '@cloudflare/workerd-windows-64@1.20260911.1':
-    resolution: {integrity: sha512-5iO/YfoBDOgO3CrHdkiiVP8SL3O2jC+c6Ux3d378TSPKLhU5+CgHjtE/ZSodWQrzr4FzFRqdW8S7n5nbyD1MHQ==}
+  '@cloudflare/workerd-windows-64@1.20260917.1':
+    resolution: {integrity: sha512-S3j07o3yMK0gzyEX+oM4/QmdtGdLxTK0mNYkQMZRjO98PjWr55TPiEkwfwcnfUNxnl6bI53MlHp1x5ZWOBg/JA==}
     engines: {node: '>=16'}
     cpu: [x64]
     os: [win32]
@@ -1517,8 +1517,8 @@ packages:
       oxc-transform-react:
         optional: true
 
-  '@vitejs/plugin-rsc@0.5.34':
-    resolution: {integrity: sha512-95V6fyGQklQMYIWTr5qwwNmpDYxsHkTunuzq8i/keIcgdckL9zb6nyEgTnb1CEl1IPJWVxGgORMkTFHrct7XJg==}
+  '@vitejs/plugin-rsc@0.5.35':
+    resolution: {integrity: sha512-OZtJ57o5luSeNb2lqi3xeHHF41W8jCgm4nGb/1qmKjLb5gk/szIHS0Wxfo82WWQkKIqBBu6M697ohKWXrP0qqg==}
     peerDependencies:
       react: '*'
       react-dom: '*'
@@ -2463,11 +2463,11 @@ packages:
     resolution: {integrity: sha512-7vuh85V5cdDofPyxn58nrPjBktZo0u9x1g8WtjQol+jZDaE+fhN+cIvTj11GndBnMnyfrUOG1sZQxCdjKh+DKg==}
     engines: {node: '>= 10.13.0'}
 
+  js-tokens@10.0.0:
+    resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
+
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
-
-  js-tokens@9.0.1:
-    resolution: {integrity: sha512-mxa9E9ITFOt0ban3j6L5MpjwegGz6lBQmM1IJkWeBZGcMxto50+eWdjC/52xDbS2vy0k7vIMK0Fe2wfL9OQSpQ==}
 
   js-yaml@4.3.2:
     resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
@@ -2615,6 +2615,9 @@ packages:
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
+  magic-string@1.4.1:
+    resolution: {integrity: sha512-8lyCu36ErXR0J9uaGKlKQoiLZKmtI63YGLE8G2o9jyRPdr4X47LusSOwgOJOzcVtp81fTAAjxR7BwKz682Jhow==}
+
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
@@ -2634,8 +2637,8 @@ packages:
     resolution: {integrity: sha512-aU5EJuIN2WDemCcAp2vFBfp/m4EAhWJnUNSSw0ixs7/kXbd6Pg64EmwJkNdFhB8aWt1sH2CTXrLxo/iAGV3oPQ==}
     engines: {node: '>= 0.6'}
 
-  miniflare@5.20260911.1-alpha:
-    resolution: {integrity: sha512-7IDj9monoYcCPrS8HfcTt90T3pDwKGvNEAR1Y061KbJhBd5JkStOwOpHMUDFBo9PEbjWVDxPICAnXGNNV2LNfQ==}
+  miniflare@5.20260917.0-alpha:
+    resolution: {integrity: sha512-NpZyBR+h/nonVA/YO/+1/UJpIl8lTwCgpFPVp/KVzAhb8JuCRImPDfyrft040659Zna1RS3Lt2pzTs5Vwy5QSA==}
     engines: {node: '>=22.0.0'}
 
   minimatch@10.2.6:
@@ -2783,6 +2786,10 @@ packages:
     resolution: {integrity: sha512-gXah6aZrcUxjWg2zR2MwouP2eHlCBzdV4pygudehaKXSGW4v2AsRQUK+lwwXhii6KFZcunEnmSUoYp5CXibxtA==}
     engines: {node: '>= 0.4'}
 
+  obug@3.0.0:
+    resolution: {integrity: sha512-5vvB5+W7ePv+p3uqxi+RcW1XAzLW0/hxt3/4X4Lc4qHudzOhmBiBwOY6DRob4WnanAEGvNcLjF+KNOufrUoEQw==}
+    engines: {node: '>=12.20.0'}
+
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
     engines: {node: '>= 0.8.0'}
@@ -2874,12 +2881,12 @@ packages:
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
-  react-server-dom-webpack@19.2.8:
-    resolution: {integrity: sha512-rFO1VJZ+cH9ZH6hGy9+qmIsmZHZpCMKJZXhWHqT71UnSfg+w+W+gwrwp58MVzMqdFquG8GF1c6C8q0OGphkEdg==}
+  react-server-dom-webpack@19.3.0:
+    resolution: {integrity: sha512-ymt9RkvWtW4OpIhWf1wj4u5CxnBaVbDCkz/bw3/QFmOE7+/wg8C30uiJ/QqkEdWn/UqT5c7/rOUW/eWYMwceCg==}
     engines: {node: '>=0.10.0'}
     peerDependencies:
-      react: ^19.2.8
-      react-dom: ^19.2.8
+      react: ^19.3.0
+      react-dom: ^19.3.0
       webpack: ^5.59.0
 
   react@19.2.8:
@@ -3056,8 +3063,8 @@ packages:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
 
-  strip-literal@3.1.0:
-    resolution: {integrity: sha512-8r3mkIM/2+PpjHoOtiAW8Rg3jJLHaV7xPwG+YRGrv6FP0wwk/toTpATxWYOW0BKdWwl82VT2tFYi5DlROa0Mxg==}
+  strip-literal@4.0.0:
+    resolution: {integrity: sha512-PaqAvfUZKBwc/SLmNZtHmzK+v19Z4O4eS3cKPeGvbIv/U3pnyEq4Tuw3/4v/FwfM8VQaEawsyCcOQ0P+kpwWWw==}
 
   styled-jsx@5.1.6:
     resolution: {integrity: sha512-qSVyDTeMotdvQYoHWLNGwRFJHC+i+ZvdBRYosOFgC+Wg1vx4frN2/RG/NA7SYqqvKNLf39P2LSRA2pu6n0XYZA==}
@@ -3315,17 +3322,17 @@ packages:
     resolution: {integrity: sha512-BN22B5eaMMI9UMtjrGd5g5eCYPpCPDUy0FJXbYsaT5zYxjFOckS53SQDE3pWkVoWpHXVb3BrYcEN4Twa55B5cA==}
     engines: {node: '>=0.10.0'}
 
-  workerd@1.20260911.1:
-    resolution: {integrity: sha512-vRr8QdBxueQOZJO1hRCI73EZlix87IAyBAcSyI3rA1VB+6oxjw3oaqzYnIV8C4IOPtUgihbdMAgzkb5GM4V7DQ==}
+  workerd@1.20260917.1:
+    resolution: {integrity: sha512-k072RxsZfRz2cnyAq1Titt+0VpNfnFizSXUkT3r15CDJECBfBXj6JeKK0Bk5CrBLAHGP+dvOHjI//TP7GHXDEw==}
     engines: {node: '>=16'}
     hasBin: true
 
-  wrangler@4.131.2:
-    resolution: {integrity: sha512-jmkGE7monbPKyYQr1FPQN+SARVhddqw2fhXOmTKCw4lroqlFGSS6rit/RTvPi/qzNLKrXxkS8DhWXasJnStplg==}
+  wrangler@4.134.0:
+    resolution: {integrity: sha512-65JbYVGSt0XpPH8O/y6pNuS0t+AvvwVv+VRPbqYsNI5NMF9oFiJxVoS5GYU47ooamF9ucSXWvGyQ6QnAtXLgRA==}
     engines: {node: '>=22.0.0'}
     hasBin: true
     peerDependencies:
-      '@cloudflare/workers-types': ^5.20260911.1
+      '@cloudflare/workers-types': ^5.20260917.1
     peerDependenciesMeta:
       '@cloudflare/workers-types':
         optional: true
@@ -3471,39 +3478,39 @@ snapshots:
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 
-  '@cloudflare/unenv-preset@2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260911.1)':
+  '@cloudflare/unenv-preset@2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260917.1)':
     dependencies:
       unenv: 2.0.0-rc.24
     optionalDependencies:
-      workerd: 1.20260911.1
+      workerd: 1.20260917.1
 
-  '@cloudflare/vite-plugin@1.54.9(@types/node@22.19.19)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))(wrangler@4.131.2(@cloudflare/workers-types@4.20260515.1)(@types/node@22.19.19))':
+  '@cloudflare/vite-plugin@1.55.0(@types/node@22.19.19)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))(wrangler@4.134.0(@cloudflare/workers-types@4.20260515.1)(@types/node@22.19.19))':
     dependencies:
-      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260911.1)
-      miniflare: 5.20260911.1-alpha(@types/node@22.19.19)
+      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260917.1)
+      miniflare: 5.20260917.0-alpha(@types/node@22.19.19)
       unenv: 2.0.0-rc.24
       vite: 8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)
-      workerd: 1.20260911.1
-      wrangler: 4.131.2(@cloudflare/workers-types@4.20260515.1)(@types/node@22.19.19)
+      workerd: 1.20260917.1
+      wrangler: 4.134.0(@cloudflare/workers-types@4.20260515.1)(@types/node@22.19.19)
       ws: 8.21.0
     transitivePeerDependencies:
       - '@types/node'
       - bufferutil
       - utf-8-validate
 
-  '@cloudflare/workerd-darwin-64@1.20260911.1':
+  '@cloudflare/workerd-darwin-64@1.20260917.1':
     optional: true
 
-  '@cloudflare/workerd-darwin-arm64@1.20260911.1':
+  '@cloudflare/workerd-darwin-arm64@1.20260917.1':
     optional: true
 
-  '@cloudflare/workerd-linux-64@1.20260911.1':
+  '@cloudflare/workerd-linux-64@1.20260917.1':
     optional: true
 
-  '@cloudflare/workerd-linux-arm64@1.20260911.1':
+  '@cloudflare/workerd-linux-arm64@1.20260917.1':
     optional: true
 
-  '@cloudflare/workerd-windows-64@1.20260911.1':
+  '@cloudflare/workerd-windows-64@1.20260917.1':
     optional: true
 
   '@cloudflare/workers-types@4.20260515.1': {}
@@ -4387,21 +4394,22 @@ snapshots:
       '@rolldown/pluginutils': 1.0.1
       vite: 8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)
 
-  '@vitejs/plugin-rsc@0.5.34(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))':
+  '@vitejs/plugin-rsc@0.5.35(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
       es-module-lexer: 2.3.2
       estree-walker: 3.0.3
-      magic-string: 0.30.21
+      magic-string: 1.4.1
+      obug: 3.0.0
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       srvx: 0.12.8
-      strip-literal: 3.1.0
+      strip-literal: 4.0.0
       turbo-stream: 3.2.1
       vite: 8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)
       vitefu: 1.1.3(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))
     optionalDependencies:
-      react-server-dom-webpack: 19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19)))
+      react-server-dom-webpack: 19.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19)))
 
   '@webassemblyjs/ast@1.14.1':
     dependencies:
@@ -5542,9 +5550,9 @@ snapshots:
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
-  js-tokens@4.0.0: {}
+  js-tokens@10.0.0: {}
 
-  js-tokens@9.0.1: {}
+  js-tokens@4.0.0: {}
 
   js-yaml@4.3.2:
     dependencies:
@@ -5662,6 +5670,10 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
 
+  magic-string@1.4.1:
+    dependencies:
+      '@jridgewell/sourcemap-codec': 1.6.0
+
   math-intrinsics@1.1.0: {}
 
   merge-stream@2.0.0: {}
@@ -5675,12 +5687,12 @@ snapshots:
 
   mime-db@1.54.0: {}
 
-  miniflare@5.20260911.1-alpha(@types/node@22.19.19):
+  miniflare@5.20260917.0-alpha(@types/node@22.19.19):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.4(@types/node@22.19.19)
       undici: 7.29.0
-      workerd: 1.20260911.1
+      workerd: 1.20260917.1
       ws: 8.21.0
       youch: 4.1.0-beta.10
     transitivePeerDependencies:
@@ -5797,6 +5809,8 @@ snapshots:
       define-properties: 1.2.1
       es-object-atoms: 1.1.2
 
+  obug@3.0.0: {}
+
   optionator@0.9.4:
     dependencies:
       deep-is: 0.1.4
@@ -5883,7 +5897,7 @@ snapshots:
 
   react-is@16.13.1: {}
 
-  react-server-dom-webpack@19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))):
+  react-server-dom-webpack@19.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
@@ -6166,9 +6180,9 @@ snapshots:
 
   strip-json-comments@3.1.1: {}
 
-  strip-literal@3.1.0:
+  strip-literal@4.0.0:
     dependencies:
-      js-tokens: 9.0.1
+      js-tokens: 10.0.0
 
   styled-jsx@5.1.6(@babel/core@7.29.7(supports-color@10.2.2))(react@19.2.8):
     dependencies:
@@ -6339,7 +6353,7 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  vinext@1.0.0-beta.9(@vitejs/plugin-react@6.1.1(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)))(@vitejs/plugin-rsc@0.5.34(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)))(next@16.3.5(@babel/core@7.29.7(supports-color@10.2.2))(@types/node@22.19.19)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)):
+  vinext@1.0.0-beta.9(@vitejs/plugin-react@6.1.1(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)))(@vitejs/plugin-rsc@0.5.35(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)))(next@16.3.5(@babel/core@7.29.7(supports-color@10.2.2))(@types/node@22.19.19)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13)):
     dependencies:
       '@unpic/react': 1.0.2(next@16.3.5(@babel/core@7.29.7(supports-color@10.2.2))(@types/node@22.19.19)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@vercel/og': 0.8.6
@@ -6353,8 +6367,8 @@ snapshots:
       vite-plugin-commonjs: 0.10.4
       web-vitals: 4.2.4
     optionalDependencies:
-      '@vitejs/plugin-rsc': 0.5.34(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))
-      react-server-dom-webpack: 19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19)))
+      '@vitejs/plugin-rsc': 0.5.35(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19))))(react@19.2.8)(vite@8.3.0(@types/node@22.19.19)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.13))
+      react-server-dom-webpack: 19.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.110.3(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(sharp@0.35.4(@types/node@22.19.19)))
     transitivePeerDependencies:
       - next
 
@@ -6483,24 +6497,24 @@ snapshots:
 
   word-wrap@1.2.5: {}
 
-  workerd@1.20260911.1:
+  workerd@1.20260917.1:
     optionalDependencies:
-      '@cloudflare/workerd-darwin-64': 1.20260911.1
-      '@cloudflare/workerd-darwin-arm64': 1.20260911.1
-      '@cloudflare/workerd-linux-64': 1.20260911.1
-      '@cloudflare/workerd-linux-arm64': 1.20260911.1
-      '@cloudflare/workerd-windows-64': 1.20260911.1
+      '@cloudflare/workerd-darwin-64': 1.20260917.1
+      '@cloudflare/workerd-darwin-arm64': 1.20260917.1
+      '@cloudflare/workerd-linux-64': 1.20260917.1
+      '@cloudflare/workerd-linux-arm64': 1.20260917.1
+      '@cloudflare/workerd-windows-64': 1.20260917.1
 
-  wrangler@4.131.2(@cloudflare/workers-types@4.20260515.1)(@types/node@22.19.19):
+  wrangler@4.134.0(@cloudflare/workers-types@4.20260515.1)(@types/node@22.19.19):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
-      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260911.1)
+      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260917.1)
       blake3-wasm: 2.1.5
       esbuild: 0.28.1
-      miniflare: 5.20260911.1-alpha(@types/node@22.19.19)
+      miniflare: 5.20260917.0-alpha(@types/node@22.19.19)
       path-to-regexp: 6.3.0
       unenv: 2.0.0-rc.24
-      workerd: 1.20260911.1
+      workerd: 1.20260917.1
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260515.1
       fsevents: 2.3.3
